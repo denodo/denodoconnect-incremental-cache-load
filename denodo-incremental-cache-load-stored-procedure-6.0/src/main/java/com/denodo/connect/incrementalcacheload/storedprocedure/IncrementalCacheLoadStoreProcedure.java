@@ -9,11 +9,24 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
+import com.denodo.connect.incrementalcacheload.storedprocedure.util.Utils;
 import com.denodo.vdb.engine.storedprocedure.AbstractStoredProcedure;
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironment;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureException;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureParameter;
 
+/***
+ * The Denodo Incremental Cache Load is a tool that allows the execution of an
+ * incremental cache load on demand. It saves the current scenario of having to
+ * perform two queries with one insert into cache per new/modified tuple to be
+ * cached. This SP can perform this same operation in blocks, by asking VDP to
+ * update the cache with SELECT queries using large blocks of "IN" conditions
+ * (as large as allowed by the cached source) defined in the parameters of the
+ * execution.
+ * 
+ * @author acastro
+ *
+ */
 public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure {
 
     private static final long serialVersionUID = 2998394943002628742L;
@@ -65,9 +78,9 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
     public StoredProcedureParameter[] getParameters() {
         return new StoredProcedureParameter[] {
                 // Input parameters
+                new StoredProcedureParameter("database_name", Types.VARCHAR, StoredProcedureParameter.DIRECTION_IN),
                 new StoredProcedureParameter("view_name", Types.VARCHAR, StoredProcedureParameter.DIRECTION_IN),
                 new StoredProcedureParameter("last_update_condition", Types.VARCHAR, StoredProcedureParameter.DIRECTION_IN),
-                new StoredProcedureParameter("pk_field", Types.VARCHAR, StoredProcedureParameter.DIRECTION_IN),
                 new StoredProcedureParameter("num_elements_in_clause", Types.VARCHAR, StoredProcedureParameter.DIRECTION_IN),
                 // Output parameter
                 new StoredProcedureParameter("num_updated_rows", Types.VARCHAR, StoredProcedureParameter.DIRECTION_OUT) };
@@ -87,19 +100,19 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
         try {
 
-            // Parameter validation
+            // Input parameter validation
             long startAux = System.nanoTime();
-            validateParameters(inputValues);
+            Utils.validateInputParameters(environment, inputValues);
             long endAux = System.nanoTime();
             double seconds = (endAux - startAux) / 1000000000.0;
             log(LOG_TRACE, "Time elapsed during parameter validation: \t " + seconds + " seconds.");
 
             // Initialization of variables
-            String viewName = (String) inputValues[0];
-            String lastUpdateCondition = (String) inputValues[1];
-            String pkField = (String) inputValues[2];
+            String databaseName = (String) inputValues[0];
+            String viewName = (String) inputValues[1];
+            String lastUpdateCondition = (String) inputValues[2];
             Integer numElementsInClause = Integer.valueOf((String) inputValues[3]);
-            
+
             String rowValue = StringUtils.EMPTY;
             String inClauseString = StringUtils.EMPTY;
             int pkChunkRowCount = 0;
@@ -107,9 +120,20 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             List<String> pkValuesChunk = new LinkedList<String>();
             List<String> queryList = new ArrayList<>();
 
-            // Calculate the PK fields that were updates since the lastUpdateCondition
+            // Get view PK
             startAux = System.nanoTime();
-            String query = "SELECT " + pkField + " FROM " + viewName + " WHERE " + lastUpdateCondition + " CONTEXT('cache'='off')";
+            List<String> pkFields = Utils.getPkFieldsByViewNameAndDb(environment, databaseName, viewName);
+
+            if (pkFields == null || pkFields.isEmpty()) {
+                throw new StoredProcedureException(
+                        "The view " + viewName + " from the DB " + databaseName + " has no primary key. Cache won't be updated");
+            }
+
+            boolean singlePk = pkFields.size() == 1 ? true : false;
+
+            // Calculate the PK fields that were updated since the lastUpdateCondition
+            String query = "SELECT " + StringUtils.join(pkFields, ", ") + " FROM " + viewName + " WHERE " + lastUpdateCondition
+                    + " CONTEXT('cache'='off')";
             ResultSet rs = this.environment.executeQuery(query);
             endAux = System.nanoTime();
             seconds = (endAux - startAux) / 1000000000.0;
@@ -122,24 +146,59 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
                 rowCount++;
                 pkChunkRowCount++;
-                rowValue = rs.getObject(1).toString();
-                pkValuesChunk.add(rowValue);
 
-                if (pkChunkRowCount == numElementsInClause.intValue() || rs.isLast()) {
+                if (singlePk) {
 
-                    // Creation of the IN clause with the specified chunk: numElementsInClause
-                    inClauseString = StringUtils.join(pkValuesChunk, ",");
+                    // PK is one only field
 
-                    // Cache refresh of PK Chunk
-                    query = "SELECT * FROM " + viewName + " WHERE " + pkField + " IN (" + inClauseString + ") "
-                            + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
-                            + "'returnqueryresults'='false','cache_wait_for_load'='true')";
+                    rowValue = rs.getObject(1).toString();
+                    pkValuesChunk.add("'" + rowValue + "'");
 
-                    queryList.add(query);
+                    if (pkChunkRowCount == numElementsInClause.intValue() || rs.isLast()) {
 
-                    // Reset the chunk
-                    pkChunkRowCount = 0;
-                    pkValuesChunk.clear();
+                        // Creation of the IN clause with the specified chunk: numElementsInClause
+                        inClauseString = StringUtils.join(pkValuesChunk, ",");
+
+                        // Cache refresh of PK Chunk
+                        query = "SELECT * FROM " + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString + ") "
+                                + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
+                                + "'returnqueryresults'='false','cache_wait_for_load'='true')";
+
+                        queryList.add(query);
+
+                        // Reset the chunk
+                        pkChunkRowCount = 0;
+                        pkValuesChunk.clear();
+                    }
+
+                } else {
+
+                    // PK has two or more fields. We build a "full key" concatenating them all.
+
+                    StringBuilder pkJoined = new StringBuilder();
+                    pkJoined.append("'");
+                    for (int i = 1; i <= pkFields.size(); i++) {
+                        pkJoined.append(rs.getObject(i).toString());
+                    }
+                    pkJoined.append("'");
+                    pkValuesChunk.add(pkJoined.toString());
+
+                    if (pkChunkRowCount == numElementsInClause.intValue() || rs.isLast()) {
+
+                        // Creation of the IN clause with the specified chunk: numElementsInClause
+                        inClauseString = StringUtils.join(pkValuesChunk, ",");
+
+                        // Cache refresh of PK Chunk
+                        query = "SELECT * FROM " + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", ") + ") IN ("
+                                + inClauseString + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
+                                + "'returnqueryresults'='false','cache_wait_for_load'='true')";
+
+                        queryList.add(query);
+
+                        // Reset the chunk
+                        pkChunkRowCount = 0;
+                        pkValuesChunk.clear();
+                    }
                 }
             }
 
@@ -177,83 +236,6 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         long end = System.nanoTime();
         double seconds = (end - start) / 1000000000.0;
         log(LOG_DEBUG, "END of the Incremental Cache Load SP. Time elapsed: \t " + seconds + " seconds.");
-
-    }
-
-    // TODO: Improve strategy and avoid cyclomatic complexity
-    private void validateParameters(Object[] inputValues)
-            throws StoredProcedureException {
-        
-        boolean hasErrors = false;
-        List<String> errorMessages = new LinkedList<>();
-        errorMessages.add("\n");
-
-        // Test if viewName is valid
-        String viewName = (String) inputValues[0];
-        if (StringUtils.isEmpty(viewName)) {
-            hasErrors = true;
-            errorMessages.add("view_name can't be empty.");
-        } else {
-            try {
-                this.environment.executeQuery("select 1 from " + viewName + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
-            } catch (StoredProcedureException e) {
-                hasErrors = true;
-                errorMessages.add("view_name = '" + viewName + "' is not valid.");
-            }
-        }
-
-        // Test if lastUpdateCondition is valid
-        String lastUpdateCondition = (String) inputValues[1];
-        if (StringUtils.isEmpty(lastUpdateCondition)) {
-            hasErrors = true;
-            errorMessages.add("last_update_condition can't be empty.");
-        } else {
-            try {
-                this.environment.executeQuery(
-                        "select 1 from " + viewName + " where " + lastUpdateCondition + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
-            } catch (StoredProcedureException e) {
-                hasErrors = true;
-                errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid.");
-            }
-        }
-
-        // Test if pkField is valid
-        String pkField = (String) inputValues[2];
-        if (StringUtils.isEmpty(pkField)) {
-            hasErrors = true;
-            errorMessages.add("pk_field can't be empty.");
-        } else {
-            try {
-                this.environment
-                        .executeQuery("select " + pkField + " from " + viewName + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
-            } catch (Exception e) {
-                hasErrors = true;
-                errorMessages.add("pk_field = '" + pkField + "' is not valid.");
-            }
-        }
-
-        // Test if numElementsInClause is valid
-        if (inputValues[3] != null) {
-            Integer numElementsInClause = null;
-            try {
-                numElementsInClause = Integer.valueOf((String) inputValues[3]);
-                if (numElementsInClause.intValue() <= 0) {
-                    hasErrors = true;
-                    errorMessages.add("num_elements_in_clause must be greater than 0.");
-                }
-            } catch (Exception e) {
-                hasErrors = true;
-                errorMessages.add("num_elements_in_clause = " + inputValues[3] + " is not valid.");
-            }
-        } else {
-            hasErrors = true;
-            errorMessages.add("num_elements_in_clause can't be empty.");
-        }
-        
-        if (hasErrors) {
-            throw new StoredProcedureException(StringUtils.join(errorMessages, "\n"));
-        }
-            
 
     }
 

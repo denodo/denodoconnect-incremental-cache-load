@@ -13,6 +13,16 @@
 
     <fileSets>
         <fileSet>
+            <directory>${basedir}/target/</directory>
+            <outputDirectory>/dist</outputDirectory>
+            <includes>
+                <include>${project.artifactId}-${project.version}.jar</include>
+                <include>${project.artifactId}-${project.version}-javadoc.jar</include>
+                <include>${project.artifactId}-${project.version}-sources.jar</include>
+                <include>${project.artifactId}-${project.version}-jar-with-dependencies.jar</include>
+            </includes>
+        </fileSet>
+        <fileSet>
             <directory>${basedir}/</directory>
             <outputDirectory>/</outputDirectory>
             <includes>
@@ -23,14 +33,24 @@
             </includes>
         </fileSet>
         <fileSet>
-            <directory>${basedir}/doc/</directory>
-            <outputDirectory>/doc</outputDirectory>
-            <includes>
-                <!-- We don't include subfolders in order to avoid including 
-                    material from courses, training, etc. -->
-                <include>*.pdf</include>
-            </includes>
+          <directory>${basedir}/../denodo-incremental-cache-load-stored-procedure-6.0/doc/</directory>
+          <outputDirectory>/doc</outputDirectory>
+          <includes>
+            <include>**/*.pdf</include>
+          </includes>
         </fileSet>
     </fileSets>
+
+
+<!--     <dependencySets> -->
+<!--         <dependencySet> -->
+<!--             <outputDirectory>/lib</outputDirectory> -->
+<!--             <unpack>false</unpack> -->
+<!--             <scope>runtime</scope> -->
+<!-- 		    <excludes> -->
+<!--         		<exclude>denodo-incremental-cache-load-stored-procedure-7.0</exclude> -->
+<!--       		</excludes> -->
+<!--         </dependencySet> -->
+<!--     </dependencySets> -->
 
 </assembly>

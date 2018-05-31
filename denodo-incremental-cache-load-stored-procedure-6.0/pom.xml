@@ -26,10 +26,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.denodo.connect.incrementalcacheload</groupId>
-    <artifactId>denodo-incremental-cache-load-stored-procedure-6.0</artifactId>
+    <artifactId>denodo-incremental-cache-load-6.0</artifactId>
     <name>${project.artifactId}</name>
     <packaging>jar</packaging>
-    <version>ci</version>
+    <version>20180531</version>
 
     <description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
 
@@ -118,6 +118,12 @@
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
                         <manifestEntries>
+                            <Extension-Name>${project.artifactId}</Extension-Name>
+                            <Extension-Description>${project.name}</Extension-Description>
+                            <Extension-Version>${project.version}</Extension-Version>
+                            <Extension-Target-Version>6.0</Extension-Target-Version>
+                            <Extension-Target-Update>20180531</Extension-Target-Update>
+                            <Extension-Website>http://support.denodo.com</Extension-Website>
                             <!-- These two entries are non-standard, specified 
                                 by the Apache Software Foundation in -->
                             <!-- their release preparation procedures as 
@@ -145,6 +151,33 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <archive>
+                        <addMavenDescriptor>false</addMavenDescriptor>
+                        <manifest>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <Extension-Name>${project.artifactId}</Extension-Name>
+                            <Extension-Description>${project.name}</Extension-Description>
+                            <Extension-Version>${project.version}</Extension-Version>
+                            <Extension-Target-Version>6.0</Extension-Target-Version>
+                            <Extension-Target-Update>20180531</Extension-Target-Update>
+                            <Extension-Website>http://support.denodo.com</Extension-Website>
+                            <!-- These two entries are non-standard, specified 
+                                by the Apache Software Foundation in -->
+                            <!-- their release preparation procedures as 
+                                a way to pass this information on to the -->
+                            <!-- library users. See: http://commons.apache.org/releases/prepare.html -->
+                            <X-Compile-Source-JDK>${maven.compile.source}</X-Compile-Source-JDK>
+                            <X-Compile-Target-JDK>${maven.compile.target}</X-Compile-Target-JDK>
+                            <!-- Setting this overrides the standard value, 
+                                which is set to the user building the release -->
+                            <Built-By>denodo</Built-By>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
             </plugin>
 
             <plugin>
@@ -164,28 +197,6 @@
                         <goals>
                             <goal>jar</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.2-beta-5</version>
-                <executions>
-                    <execution>
-                        <id>make-assembly-dist</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>attached</goal>
-                        </goals>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>${basedir}/src/main/assembly/dist.xml</descriptor>
-                            </descriptors>
-                            <appendAssemblyId>true</appendAssemblyId>
-                            <finalName>${project.artifactId}-${project.version}</finalName>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -215,6 +226,28 @@
                 </executions>
             </plugin>
 
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.2-beta-5</version>
+                <executions>
+                    <execution>
+                        <id>make-assembly-dist</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attached</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>${basedir}/src/main/assembly/dist.xml</descriptor>
+                            </descriptors>
+                            <appendAssemblyId>true</appendAssemblyId>
+                            <finalName>${project.artifactId}-${project.version}</finalName>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
 
     </build>
@@ -224,8 +257,15 @@
 
         <dependency>
             <groupId>com.denodo.vdp</groupId>
-            <artifactId>denodo-vdp-server-base</artifactId>
-            <version>5.5.0_12</version>
+            <artifactId>denodo-vdp-server</artifactId>
+            <version>6.0.10</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.denodo.vdp</groupId>
+            <artifactId>denodo-vdp-parser</artifactId>
+            <version>6.0.10</version>
             <scope>provided</scope>
         </dependency>
 

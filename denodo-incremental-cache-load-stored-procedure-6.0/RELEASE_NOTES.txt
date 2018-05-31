@@ -1,3 +1,3 @@
-[ci]
+[20180531]
 ========
 - First version of the Denodo Incremental Cache Load Stored Procedure for Denodo 6.0.
