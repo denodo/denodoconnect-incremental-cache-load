@@ -12,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.Utils;
 import com.denodo.vdb.engine.storedprocedure.AbstractStoredProcedure;
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironment;
+import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironmentImpl;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureException;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureParameter;
 
@@ -99,10 +100,12 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         log(LOG_DEBUG, "START of the Incremental Cache Load SP.");
 
         try {
+            
+            final DatabaseEnvironmentImpl databaseEnvironmentImpl = (DatabaseEnvironmentImpl) getEnvironment();
 
             // Input parameter validation
             long startAux = System.nanoTime();
-            Utils.validateInputParameters(environment, inputValues);
+            Utils.validateInputParameters(environment, databaseEnvironmentImpl, inputValues);
             long endAux = System.nanoTime();
             double seconds = (endAux - startAux) / 1000000000.0;
             log(LOG_TRACE, "Time elapsed during parameter validation: \t " + seconds + " seconds.");
@@ -112,7 +115,14 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             String viewName = (String) inputValues[1];
             String lastUpdateCondition = (String) inputValues[2];
             Integer numElementsInClause = Integer.valueOf((String) inputValues[3]);
-
+            
+            // Check if the cache is enabled before updating
+            boolean isCacheEnabled = databaseEnvironmentImpl.isCacheEnabled(databaseName);
+            
+            if (!isCacheEnabled) {
+                throw new StoredProcedureException("The cache is not enabled in the Server.");                
+            } 
+            
             String rowValue = StringUtils.EMPTY;
             String inClauseString = StringUtils.EMPTY;
             int pkChunkRowCount = 0;
@@ -132,7 +142,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             boolean singlePk = pkFields.size() == 1 ? true : false;
 
             // Calculate the PK fields that were updated since the lastUpdateCondition
-            String query = "SELECT " + StringUtils.join(pkFields, ", ") + " FROM " + viewName + " WHERE " + lastUpdateCondition
+            String query = "SELECT " + StringUtils.join(pkFields, ", ") + " FROM "  + databaseName + "." + viewName +  " WHERE " + lastUpdateCondition
                     + " CONTEXT('cache'='off')";
             ResultSet rs = this.environment.executeQuery(query);
             endAux = System.nanoTime();
@@ -160,7 +170,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        query = "SELECT * FROM " + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString + ") "
+                        //TODO connect from another database
+                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString + ") "
                                 + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
@@ -189,7 +200,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        query = "SELECT * FROM " + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", ") + ") IN ("
+                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", ") + ") IN ("
                                 + inClauseString + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
@@ -231,7 +242,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         } catch (StoredProcedureException | SecurityException | IllegalStateException | SQLException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
             throw new StoredProcedureException(e);
-        }
+        } 
 
         long end = System.nanoTime();
         double seconds = (end - start) / 1000000000.0;
