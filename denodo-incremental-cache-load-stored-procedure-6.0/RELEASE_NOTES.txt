@@ -1,3 +1,7 @@
+[20180627]
+========
+- Added #38290 - Clarify the behavior of this SP with derived views
+
 [20180619]
 ========
 - Fixed #37875 - Denodo Incremental Cache Load - @LASTCACHEREFRESH
