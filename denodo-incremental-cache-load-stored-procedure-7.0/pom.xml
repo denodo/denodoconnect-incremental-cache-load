@@ -115,12 +115,6 @@
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
                         <manifestEntries>
-                            <Extension-Name>${project.artifactId}</Extension-Name>
-                            <Extension-Description>${project.name}</Extension-Description>
-                            <Extension-Version>${project.version}</Extension-Version>
-                            <Extension-Target-Version>7.0</Extension-Target-Version>
-                            <Extension-Target-Update>20180531</Extension-Target-Update>
-                            <Extension-Website>http://support.denodo.com</Extension-Website>
                             <!-- These two entries are non-standard, specified 
                                 by the Apache Software Foundation in -->
                             <!-- their release preparation procedures as 
@@ -131,8 +125,21 @@
                             <!-- Setting this overrides the standard value, 
                                 which is set to the user building the release -->
                             <Built-By>denodo</Built-By>
-                        </manifestEntries>
-                    </archive>
+                            </manifestEntries>
+                            <manifestSections>
+                                <manifestSection>
+                                    <name>com.denodo</name>
+                                    <manifestEntries>                            
+                                        <Extension-Name>${project.artifactId}</Extension-Name>
+                                        <Extension-Description>${project.name}</Extension-Description>
+                                        <Extension-Version>${project.version}</Extension-Version>
+                                        <Extension-Target-Version>7.0</Extension-Target-Version>
+                                        <Extension-Target-Update>20180531</Extension-Target-Update>
+                                        <Extension-Website>http://support.denodo.com</Extension-Website>
+                                     </manifestEntries>
+                                </manifestSection>
+                            </manifestSections>
+                    </archive>                            
                 </configuration>
             </plugin>
 
@@ -148,12 +155,6 @@
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
                         <manifestEntries>
-                            <Extension-Name>${project.artifactId}</Extension-Name>
-                            <Extension-Description>${project.name}</Extension-Description>
-                            <Extension-Version>${project.version}</Extension-Version>
-                            <Extension-Target-Version>7.0</Extension-Target-Version>
-                            <Extension-Target-Update>20180531</Extension-Target-Update>
-                            <Extension-Website>http://support.denodo.com</Extension-Website>
                             <!-- These two entries are non-standard, specified 
                                 by the Apache Software Foundation in -->
                             <!-- their release preparation procedures as 
@@ -164,7 +165,20 @@
                             <!-- Setting this overrides the standard value, 
                                 which is set to the user building the release -->
                             <Built-By>denodo</Built-By>
-                        </manifestEntries>
+                            </manifestEntries>
+                            <manifestSections>
+                                <manifestSection>
+                                    <name>com.denodo</name>
+                                    <manifestEntries>                            
+                                        <Extension-Name>${project.artifactId}</Extension-Name>
+                                        <Extension-Description>${project.name}</Extension-Description>
+                                        <Extension-Version>${project.version}</Extension-Version>
+                                        <Extension-Target-Version>7.0</Extension-Target-Version>
+                                        <Extension-Target-Update>20180531</Extension-Target-Update>
+                                        <Extension-Website>http://support.denodo.com</Extension-Website>
+                                     </manifestEntries>
+                                </manifestSection>
+                            </manifestSections>                            
                     </archive>
                 </configuration>
             </plugin>
