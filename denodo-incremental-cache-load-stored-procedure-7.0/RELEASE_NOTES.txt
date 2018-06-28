@@ -1,4 +1,4 @@
-[20180627]
+[20180628]
 ========
 - Added #38290 - Clarify the behavior of this SP with derived views
 
