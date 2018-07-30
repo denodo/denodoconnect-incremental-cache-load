@@ -20,7 +20,6 @@ public class Utils {
     private static DatabaseEnvironment environment;
     private static DatabaseEnvironmentImpl databaseEnvironmentImpl;
 
-    // TODO: Improve strategy and avoid cyclomatic complexity
     public static void validateInputParameters(DatabaseEnvironment env, DatabaseEnvironmentImpl databaseEnvImpl, Object[] inputValues)
             throws StoredProcedureException, SQLException {
 
@@ -52,17 +51,19 @@ public class Utils {
             throws StoredProcedureException, SQLException {
 
         List<String> pkFields = new LinkedList<>();
+        
+        String viewNameQuotesCleared = viewName.replace("\"", "");
 
-        // FIXME OJO INVOCANDO DESDE OTRA DB
         StringBuilder query = new StringBuilder();
         query.append(" SELECT distinct pk.column_name ");
         query.append(" FROM GET_PRIMARY_KEYS() pk ");
         query.append(" WHERE pk.input_database_name = '").append(databaseName).append("'");
-        query.append(" AND pk.input_view_name = '").append(viewName).append("'");
+        query.append(" AND pk.input_view_name = '").append(viewNameQuotesCleared).append("'");
         ResultSet rs = environment.executeQuery(query.toString());
 
         while (rs.next()) {
-            pkFields.add(rs.getString(1));
+            // We add the quotes to preserve the case of each PK
+            pkFields.add("\"" + rs.getString(1) + "\"");
         }
 
         rs.close();
@@ -129,8 +130,12 @@ public class Utils {
         } else if (validDB) {
             ResultSet rs = null;
             try {
-                rs = environment.executeQuery(
-                        "SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('" + databaseName + "', '" + viewName + "') LIMIT 1");
+                // CATALOG_VDP_METADATA_VIEWS is case sensitive and does not work like a select
+                // statement. So if the viewName comes rounded by double quotes ("") they must
+                // be removed
+                String viewNameQuotesCleared = viewName.replace("\"", "");
+                rs = environment.executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('" + databaseName + "', '"
+                        + viewNameQuotesCleared + "') LIMIT 1");
                 // The query returns no rows if there is no view in the database with the
                 // provided parameters
                 if (!rs.next()) {
@@ -169,8 +174,6 @@ public class Utils {
                     // lastUpdateCondition parameter override
                     inputValues[2] = lastUpdateCondition;
 
-                    // TODO
-                    // HACER PRUEBAS PARA VALIDAR LAS FECHAS
                 }
 
                 environment.executeQuery("select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition

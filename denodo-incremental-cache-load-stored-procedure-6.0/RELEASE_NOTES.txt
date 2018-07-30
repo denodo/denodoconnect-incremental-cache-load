@@ -1,3 +1,8 @@
+[20180730]
+========
+- Fixed #38521 - Issues dealing with quoted identifiers
+- Fixed #38594 - Unable to execute the procedure when the view name is "user"
+
 [20180628]
 ========
 - Added #38290 - Clarify the behavior of this SP with derived views

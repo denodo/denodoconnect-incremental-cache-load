@@ -142,7 +142,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             boolean singlePk = pkFields.size() == 1 ? true : false;
 
             // Calculate the PK fields that were updated since the lastUpdateCondition
-            String query = "SELECT " + StringUtils.join(pkFields, ", ") + " FROM "  + databaseName + "." + viewName +  " WHERE " + lastUpdateCondition
+            // Distinct clause added as is not guaranteed that the view PK has no repeated values
+            String query = "SELECT DISTINCT " + StringUtils.join(pkFields, ", ") + " FROM "  + databaseName + "." + viewName +  " WHERE " + lastUpdateCondition
                     + " CONTEXT('cache'='off')";
             ResultSet rs = this.environment.executeQuery(query);
             endAux = System.nanoTime();
@@ -170,7 +171,6 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        //TODO connect from another database
                         query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString + ") "
                                 + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
@@ -184,12 +184,15 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
                 } else {
 
-                    // PK has two or more fields. We build a "full key" concatenating them all.
+                    // PK has two or more fields. We build a "full key" concatenating them all, using "-" as separator.
 
                     StringBuilder pkJoined = new StringBuilder();
                     pkJoined.append("'");
                     for (int i = 1; i <= pkFields.size(); i++) {
                         pkJoined.append(rs.getObject(i).toString());
+                        if (i < pkFields.size()) {
+                            pkJoined.append("-");
+                        }
                     }
                     pkJoined.append("'");
                     pkValuesChunk.add(pkJoined.toString());
@@ -200,7 +203,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", ") + ") IN ("
+                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", '-', ") + ") IN ("
                                 + inClauseString + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
@@ -242,7 +245,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         } catch (StoredProcedureException | SecurityException | IllegalStateException | SQLException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
             throw new StoredProcedureException(e);
-        } 
+        }
 
         long end = System.nanoTime();
         double seconds = (end - start) / 1000000000.0;
