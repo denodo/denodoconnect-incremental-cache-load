@@ -8,12 +8,15 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
 
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironment;
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironmentImpl;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureException;
 
 public class Utils {
+    
+    private static final Logger logger = Logger.getLogger(Utils.class);
 
     private static String LAST_CACHE_REFRESH = "@LASTCACHEREFRESH";
 
@@ -66,7 +69,9 @@ public class Utils {
             pkFields.add("\"" + rs.getString(1) + "\"");
         }
 
-        rs.close();
+        if (rs != null) {
+            rs.close();            
+        }
 
         return pkFields;
     }
@@ -81,12 +86,21 @@ public class Utils {
         ps.setString(1, databaseName);
         ps.setString(2, viewName);
 
+        String dateString = null;
         ResultSet rs = ps.executeQuery();
         if (rs.next()) {
-            return DateUtils.millisecondsToStringDate(rs.getLong(1));
+            dateString = DateUtils.millisecondsToStringDate(rs.getLong(1));
+        }
+        
+        // Close resources
+        if (ps != null) {
+            ps.close();            
+        }
+        if (rs != null) {
+            rs.close();
         }
 
-        return null;
+        return dateString;
     }
 
     private static boolean testDatabaseName(String databaseName, List<String> errorMessages) throws SQLException {
@@ -108,7 +122,8 @@ public class Utils {
                 }
             } catch (StoredProcedureException e) {
                 validDB = false;
-                errorMessages.add("database_name = '" + databaseName + "' is not valid.");
+                errorMessages.add("database_name = '" + databaseName + "' is not valid. " + e.getMessage());
+                logger.debug("ERROR testDatabaseName() ", e);
             } finally {
                 if (rs != null) {
                     rs.close();
@@ -143,7 +158,8 @@ public class Utils {
                 }
             } catch (StoredProcedureException e) {
                 validView = false;
-                errorMessages.add("view_name = '" + viewName + "' does not exists in '" + databaseName + "' database.");
+                errorMessages.add("view_name = '" + viewName + "' does not exists in '" + databaseName + "' database. " + e.getMessage());
+                logger.debug("ERROR testViewName() ", e);
             } finally {
                 if (rs != null) {
                     rs.close();
@@ -178,10 +194,11 @@ public class Utils {
 
                 environment.executeQuery("select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition
                         + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
-
+                
             } catch (StoredProcedureException e) {
                 validLastUpdateCondition = false;
-                errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid.");
+                errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid. " + e.getMessage());
+                logger.debug("ERROR testLastUpdateCondition() ", e);
             }
         }
 

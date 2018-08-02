@@ -93,6 +93,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
      * @param inputValues
      *            array with input parameters
      */
+    @SuppressWarnings("boxing")
     @Override
     public void doCall(Object[] inputValues) throws StoredProcedureException {
 
@@ -100,7 +101,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         log(LOG_DEBUG, "START of the Incremental Cache Load SP.");
 
         try {
-            
+
             final DatabaseEnvironmentImpl databaseEnvironmentImpl = (DatabaseEnvironmentImpl) getEnvironment();
 
             // Input parameter validation
@@ -115,14 +116,14 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             String viewName = (String) inputValues[1];
             String lastUpdateCondition = (String) inputValues[2];
             Integer numElementsInClause = Integer.valueOf((String) inputValues[3]);
-            
+
             // Check if the cache is enabled before updating
             boolean isCacheEnabled = databaseEnvironmentImpl.isCacheEnabled(databaseName);
-            
+
             if (!isCacheEnabled) {
-                throw new StoredProcedureException("The cache is not enabled in the Server.");                
-            } 
-            
+                throw new StoredProcedureException("The cache is not enabled in the Server.");
+            }
+
             String rowValue = StringUtils.EMPTY;
             String inClauseString = StringUtils.EMPTY;
             int pkChunkRowCount = 0;
@@ -142,9 +143,10 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             boolean singlePk = pkFields.size() == 1 ? true : false;
 
             // Calculate the PK fields that were updated since the lastUpdateCondition
-            // Distinct clause added as is not guaranteed that the view PK has no repeated values
-            String query = "SELECT DISTINCT " + StringUtils.join(pkFields, ", ") + " FROM "  + databaseName + "." + viewName +  " WHERE " + lastUpdateCondition
-                    + " CONTEXT('cache'='off')";
+            // Distinct clause added as is not guaranteed that the view PK has no repeated
+            // values
+            String query = "SELECT DISTINCT " + StringUtils.join(pkFields, ", ") + " FROM " + databaseName + "." + viewName + " WHERE "
+                    + lastUpdateCondition + " CONTEXT('cache'='off')";
             ResultSet rs = this.environment.executeQuery(query);
             endAux = System.nanoTime();
             seconds = (endAux - startAux) / 1000000000.0;
@@ -153,6 +155,10 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             // Creation of the array of queries to be executed to update the cache
             log(LOG_TRACE, "BEGIN of the building of the query array.");
             startAux = System.nanoTime();
+
+            // Variable used to check if we need quotes around the values in the IN clause
+            // in singlePK context
+            Boolean isNumericPK = null;
             while (rs.next()) {
 
                 rowCount++;
@@ -162,8 +168,17 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
                     // PK is one only field
 
+                    // We check the type only once
+                    if (isNumericPK == null) {
+                        isNumericPK = Boolean.valueOf(rs.getObject(1) instanceof Number);
+                    }
+
                     rowValue = rs.getObject(1).toString();
-                    pkValuesChunk.add("'" + rowValue + "'");
+                    if (!isNumericPK) {
+                        // If the type is not numeric, we surround the value with quotes
+                        rowValue = "'" + rowValue + "'";
+                    }
+                    pkValuesChunk.add(rowValue);
 
                     if (pkChunkRowCount == numElementsInClause.intValue() || rs.isLast()) {
 
@@ -171,8 +186,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString + ") "
-                                + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
+                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE " + pkFields.get(0) + " IN (" + inClauseString
+                                + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
                         queryList.add(query);
@@ -184,7 +199,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
                 } else {
 
-                    // PK has two or more fields. We build a "full key" concatenating them all, using "-" as separator.
+                    // PK has two or more fields. We build a "full key" concatenating them all,
+                    // using "-" as separator.
 
                     StringBuilder pkJoined = new StringBuilder();
                     pkJoined.append("'");
@@ -203,8 +219,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                         inClauseString = StringUtils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
-                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", '-', ") + ") IN ("
-                                + inClauseString + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
+                        query = "SELECT * FROM " + databaseName + "." + viewName + " WHERE concat(" + StringUtils.join(pkFields, ", '-', ")
+                                + ") IN (" + inClauseString + ") " + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
                         queryList.add(query);
@@ -215,8 +231,10 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     }
                 }
             }
-
-            rs.close();
+            if (rs != null) {
+                rs.close();                
+            }
+            
             endAux = System.nanoTime();
             seconds = (endAux - startAux) / 1000000000.0;
             log(LOG_TRACE, "END of the building of the query array: \t" + seconds + " seconds.");
