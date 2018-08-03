@@ -15,7 +15,7 @@ import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironmentImpl;
 import com.denodo.vdb.engine.storedprocedure.StoredProcedureException;
 
 public class Utils {
-    
+
     private static final Logger logger = Logger.getLogger(Utils.class);
 
     private static String LAST_CACHE_REFRESH = "@LASTCACHEREFRESH";
@@ -54,7 +54,7 @@ public class Utils {
             throws StoredProcedureException, SQLException {
 
         List<String> pkFields = new LinkedList<>();
-        
+
         String viewNameQuotesCleared = viewName.replace("\"", "");
 
         StringBuilder query = new StringBuilder();
@@ -62,15 +62,26 @@ public class Utils {
         query.append(" FROM GET_PRIMARY_KEYS() pk ");
         query.append(" WHERE pk.input_database_name = '").append(databaseName).append("'");
         query.append(" AND pk.input_view_name = '").append(viewNameQuotesCleared).append("'");
-        ResultSet rs = environment.executeQuery(query.toString());
 
-        while (rs.next()) {
-            // We add the quotes to preserve the case of each PK
-            pkFields.add("\"" + rs.getString(1) + "\"");
+        ResultSet rs = null;
+        try {
+            rs = environment.executeQuery(query.toString());
+
+            while (rs.next()) {
+                // We add the quotes to preserve the case of each PK
+                pkFields.add("\"" + rs.getString(1) + "\"");
+            }
+        } catch (Exception e) {
+            logger.debug("ERROR in getPkFieldsByViewNameAndDb(): ", e);
+            throw new StoredProcedureException("ERROR getting view PK");
+        } finally {
+            // Close resources
+            DBUtils.closeRs(rs);
         }
 
-        if (rs != null) {
-            rs.close();            
+        if (pkFields == null || pkFields.isEmpty()) {
+            throw new StoredProcedureException(
+                    "The view " + viewName + " from the DB " + databaseName + " has no primary key. Cache won't be updated");
         }
 
         return pkFields;
@@ -81,23 +92,28 @@ public class Utils {
 
         Connection cacheConnection = databaseEnvironmentImpl.getCacheConnection(databaseName, true);
 
-        PreparedStatement ps = cacheConnection
-                .prepareStatement("SELECT expirationdate FROM vdb_cache_querypattern WHERE databasename = ? AND viewname = ? ");
-        ps.setString(1, databaseName);
-        ps.setString(2, viewName);
-
+        PreparedStatement ps = null;
+        ResultSet rs = null;
         String dateString = null;
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) {
-            dateString = DateUtils.millisecondsToStringDate(rs.getLong(1));
-        }
-        
-        // Close resources
-        if (ps != null) {
-            ps.close();            
-        }
-        if (rs != null) {
-            rs.close();
+
+        try {
+            ps = cacheConnection
+                    .prepareStatement("SELECT expirationdate FROM vdb_cache_querypattern WHERE databasename = ? AND viewname = ? ");
+            ps.setString(1, databaseName);
+            ps.setString(2, viewName);
+
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                dateString = DateUtils.millisecondsToStringDate(rs.getLong(1));
+            }
+        } catch (Exception e) {
+            logger.debug("ERROR in getLastModifiedViewDate(): ", e);
+            throw new StoredProcedureException("ERROR getting last modified view date");
+        } finally {
+            // Close resources
+            DBUtils.closeRs(rs);
+            DBUtils.closePs(ps);
+            DBUtils.closeConn(cacheConnection);
         }
 
         return dateString;
@@ -125,9 +141,7 @@ public class Utils {
                 errorMessages.add("database_name = '" + databaseName + "' is not valid. " + e.getMessage());
                 logger.debug("ERROR testDatabaseName() ", e);
             } finally {
-                if (rs != null) {
-                    rs.close();
-                }
+                DBUtils.closeRs(rs);
             }
         }
 
@@ -161,9 +175,7 @@ public class Utils {
                 errorMessages.add("view_name = '" + viewName + "' does not exists in '" + databaseName + "' database. " + e.getMessage());
                 logger.debug("ERROR testViewName() ", e);
             } finally {
-                if (rs != null) {
-                    rs.close();
-                }
+                DBUtils.closeRs(rs);
             }
         }
 
@@ -179,6 +191,8 @@ public class Utils {
             validLastUpdateCondition = false;
             errorMessages.add("last_update_condition can't be empty.");
         } else if (validDB && validView) {
+
+            ResultSet rs = null;
             try {
                 // Special case: @LASTCACHEREFRESH
                 if (lastUpdateCondition.contains(LAST_CACHE_REFRESH)) {
@@ -192,13 +206,15 @@ public class Utils {
 
                 }
 
-                environment.executeQuery("select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition
+                rs = environment.executeQuery("select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition
                         + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
-                
+
             } catch (StoredProcedureException e) {
                 validLastUpdateCondition = false;
                 errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid. " + e.getMessage());
                 logger.debug("ERROR testLastUpdateCondition() ", e);
+            } finally {
+                DBUtils.closeRs(rs);
             }
         }
 

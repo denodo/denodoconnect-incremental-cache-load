@@ -1,7 +1,11 @@
-[20180730]
+[20180803]
 ========
 - Fixed #38521 - Issues dealing with quoted identifiers
 - Fixed #38594 - Unable to execute the procedure when the view name is "user"
+- Fixed #38703 - Fix MANIFEST.MF entries for proper metadata management of extension
+- Fixed #38695 - LASTCACHEREFRESH not working in Oracle
+- Fixed #38694 - Issue with some DBMSs when using text literals for values of numeric IDs in IN clause
+- Added #38693 - Improve validation error messages
 
 [20180628]
 ========
