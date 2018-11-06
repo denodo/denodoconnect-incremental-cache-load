@@ -1,4 +1,4 @@
-[20180803]
+[20181106]
 ========
 - Fixed #40386 - Error using databases with unicode names
 - Fixed #40393 - Use of double-quotes with unicode parameters
