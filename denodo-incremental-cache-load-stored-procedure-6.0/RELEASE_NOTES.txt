@@ -1,5 +1,10 @@
 [20180803]
 ========
+- Fixed #40386 - Error using databases with unicode names
+- Fixed #40393 - Use of double-quotes with unicode parameters
+
+[20180803]
+========
 - Fixed #38521 - Issues dealing with quoted identifiers
 - Fixed #38594 - Unable to execute the procedure when the view name is "user"
 - Fixed #38703 - Fix MANIFEST.MF entries for proper metadata management of extension

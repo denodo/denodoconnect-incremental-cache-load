@@ -90,17 +90,22 @@ public class Utils {
     private static String getLastModifiedViewDate(DatabaseEnvironmentImpl databaseEnvironmentImpl, String databaseName, String viewName)
             throws StoredProcedureException, SQLException {
 
-        Connection cacheConnection = databaseEnvironmentImpl.getCacheConnection(databaseName, true);
+        // Views and dbs in vdb_cache_querypattern are stored without quotes, so they have to be removed in the query
+        String databaseNameQuotesCleared = databaseName.replace("\"", "");
+        String viewNameQuotesCleared = viewName.replace("\"", "");
+
+        Connection cacheConnection = databaseEnvironmentImpl.getCacheConnection(databaseNameQuotesCleared, true);
 
         PreparedStatement ps = null;
         ResultSet rs = null;
         String dateString = null;
 
+        //TODO REPLACE ""
         try {
             ps = cacheConnection
                     .prepareStatement("SELECT expirationdate FROM vdb_cache_querypattern WHERE databasename = ? AND viewname = ? ");
-            ps.setString(1, databaseName);
-            ps.setString(2, viewName);
+            ps.setString(1, databaseNameQuotesCleared);
+            ps.setString(2, viewNameQuotesCleared);
 
             rs = ps.executeQuery();
             if (rs.next()) {
@@ -130,8 +135,13 @@ public class Utils {
         } else {
             ResultSet rs = null;
             try {
+                // CATALOG_VDP_METADATA_VIEWS is case sensitive and does not work like a select
+                // statement. So if the viewName comes rounded by double quotes ("") they must
+                // be removed
+                String databaseNameQuotesCleared = databaseName.replace("\"", "");
                 rs = environment
-                        .executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('" + databaseName + "', null) LIMIT 1");
+                        .executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
+                                + databaseNameQuotesCleared + "', null) LIMIT 1");
                 // The query returns no rows if there is no database with the provided name
                 if (!rs.next()) {
                     throw new StoredProcedureException();
@@ -162,9 +172,10 @@ public class Utils {
                 // CATALOG_VDP_METADATA_VIEWS is case sensitive and does not work like a select
                 // statement. So if the viewName comes rounded by double quotes ("") they must
                 // be removed
+                String databaseNameQuotesCleared = databaseName.replace("\"", "");
                 String viewNameQuotesCleared = viewName.replace("\"", "");
-                rs = environment.executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('" + databaseName + "', '"
-                        + viewNameQuotesCleared + "') LIMIT 1");
+                rs = environment.executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
+                        + databaseNameQuotesCleared + "', '" + viewNameQuotesCleared + "') LIMIT 1");
                 // The query returns no rows if there is no view in the database with the
                 // provided parameters
                 if (!rs.next()) {
@@ -211,7 +222,9 @@ public class Utils {
 
             } catch (StoredProcedureException e) {
                 validLastUpdateCondition = false;
-                errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid. " + e.getMessage());
+                errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid. Alternatively, " +
+                        "if you are calling this stored procedure on a view/database with an unicode-based name, please " +
+                        "check that you have specified its name surrounded with double-quotes." + e.getMessage());
                 logger.debug("ERROR testLastUpdateCondition() ", e);
             } finally {
                 DBUtils.closeRs(rs);

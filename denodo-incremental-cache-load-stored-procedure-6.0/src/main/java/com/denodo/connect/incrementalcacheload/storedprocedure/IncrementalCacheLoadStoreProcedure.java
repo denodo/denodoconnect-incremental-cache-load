@@ -118,15 +118,17 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     (String) inputValues[2], Integer.valueOf((String) inputValues[3]));
 
             // Check if the cache is enabled before updating
-            boolean isCacheEnabled = databaseEnvironmentImpl.isCacheEnabled(inputParameters.getDatabaseName());
+            boolean isCacheEnabled = databaseEnvironmentImpl.isCacheEnabled(
+                    inputParameters.getDatabaseName().replaceAll("\"", ""));
 
             if (!isCacheEnabled) {
                 throw new StoredProcedureException("The cache is not enabled in the Server.");
             }
 
             // Get view PK
-            List<String> pkFields = Utils.getPkFieldsByViewNameAndDb(environment, inputParameters.getDatabaseName(),
-                    inputParameters.getViewName());
+            List<String> pkFields = Utils.getPkFieldsByViewNameAndDb(environment,
+                    inputParameters.getDatabaseName().replaceAll("\"", ""),
+                    inputParameters.getViewName().replaceAll("\"", ""));
 
             // Calculate the PK fields that were updated since the lastUpdateCondition
             // Distinct clause added as it is not guaranteed that the view PK has no repeated
@@ -169,7 +171,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
     }
 
     private void executeUpdateCache(List<String> queryList) throws StoredProcedureException {
-        // TODO Auto-generated method stub
+
         ResultSet aux = null;
         int i = 1;
 
