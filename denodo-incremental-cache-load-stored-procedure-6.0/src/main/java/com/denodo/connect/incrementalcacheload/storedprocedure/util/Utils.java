@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironment;
@@ -19,11 +18,21 @@ public class Utils {
     private static final Logger logger = Logger.getLogger(Utils.class);
 
     private static String LAST_CACHE_REFRESH = "@LASTCACHEREFRESH";
+    private static int CACHE_MODE_FULL = 3;
 
     private static DatabaseEnvironment environment;
     private static DatabaseEnvironmentImpl databaseEnvironmentImpl;
 
-    public static void validateInputParameters(DatabaseEnvironment env, DatabaseEnvironmentImpl databaseEnvImpl, Object[] inputValues)
+    /**
+     * Validates if the input parameters are correct and if the cache is enabled in both server and view
+     *
+     * @param env
+     * @param databaseEnvImpl
+     * @param inputValues
+     * @throws StoredProcedureException
+     * @throws SQLException
+     */
+    public static void validateInputParametersAndCache(DatabaseEnvironment env, DatabaseEnvironmentImpl databaseEnvImpl, Object[] inputValues)
             throws StoredProcedureException, SQLException {
 
         environment = env;
@@ -39,22 +48,27 @@ public class Utils {
 
         boolean validDB = testDatabaseName(databaseName, errorMessages);
         boolean validView = testViewName(viewName, databaseName, validDB, errorMessages);
+
+        // If cache is not valid, the process stops as it might be needed if @LASTCACHEREFRESH parameter is used
+        if (validDB && validView) {
+            testValidCache(databaseEnvironmentImpl, databaseName, viewName, errorMessages);
+        }
+
         boolean validLastUpdateCondition = testLastUpdateCondition(databaseName, viewName, lastUpdateCondition, validDB, validView,
                 errorMessages, inputValues);
         boolean validNumElementsInClause = testValidNumElementsInClause(numElementsInClause, errorMessages);
 
         // If there are errors, there will be sent to VDP
         if (!validDB || !validView || !validLastUpdateCondition || !validNumElementsInClause) {
-            throw new StoredProcedureException(StringUtils.join(errorMessages, "\n"));
+            throw new StoredProcedureException(join(errorMessages, "\n"));
         }
 
     }
 
     public static List<String> getPkFieldsByViewNameAndDb(DatabaseEnvironment environment, String databaseName, String viewName)
-            throws StoredProcedureException, SQLException {
+            throws StoredProcedureException {
 
         List<String> pkFields = new LinkedList<>();
-
         String viewNameQuotesCleared = viewName.replace("\"", "");
 
         StringBuilder query = new StringBuilder();
@@ -71,9 +85,9 @@ public class Utils {
                 // We add the quotes to preserve the case of each PK
                 pkFields.add("\"" + rs.getString(1) + "\"");
             }
-        } catch (Exception e) {
+        } catch (SQLException e) {
             logger.debug("ERROR in getPkFieldsByViewNameAndDb(): ", e);
-            throw new StoredProcedureException("ERROR getting view PK");
+            throw new StoredProcedureException("ERROR getting view PK" + e.getMessage());
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
@@ -88,7 +102,7 @@ public class Utils {
     }
 
     private static String getLastModifiedViewDate(DatabaseEnvironmentImpl databaseEnvironmentImpl, String databaseName, String viewName)
-            throws StoredProcedureException, SQLException {
+            throws StoredProcedureException {
 
         // Views and dbs in vdb_cache_querypattern are stored without quotes, so they have to be removed in the query
         String databaseNameQuotesCleared = databaseName.replace("\"", "");
@@ -100,8 +114,8 @@ public class Utils {
         ResultSet rs = null;
         String dateString = null;
 
-        //TODO REPLACE ""
         try {
+            // This needs to be standard SQL as it needs to work in every database that could be configured as cache
             ps = cacheConnection
                     .prepareStatement("SELECT expirationdate FROM vdb_cache_querypattern WHERE databasename = ? AND viewname = ? ");
             ps.setString(1, databaseNameQuotesCleared);
@@ -111,9 +125,9 @@ public class Utils {
             if (rs.next()) {
                 dateString = DateUtils.millisecondsToStringDate(rs.getLong(1));
             }
-        } catch (Exception e) {
+        } catch (SQLException e) {
             logger.debug("ERROR in getLastModifiedViewDate(): ", e);
-            throw new StoredProcedureException("ERROR getting last modified view date");
+            throw new StoredProcedureException("ERROR getting last modified view date" + e.getMessage());
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
@@ -129,7 +143,7 @@ public class Utils {
         // Test if databaseName is valid
         boolean validDB = true; // Used to know if it's necessary testing the view / lastUpdateCondition
 
-        if (StringUtils.isEmpty(databaseName)) {
+        if (databaseName == null || databaseName.length() == 0) {
             validDB = false;
             errorMessages.add("database_name can't be empty.");
         } else {
@@ -148,7 +162,7 @@ public class Utils {
                 }
             } catch (StoredProcedureException e) {
                 validDB = false;
-                errorMessages.add("database_name = '" + databaseName + "' is not valid. " + e.getMessage());
+                errorMessages.add("database_name = '" + databaseName + "' is not valid. ");
                 logger.debug("ERROR testDatabaseName() ", e);
             } finally {
                 DBUtils.closeRs(rs);
@@ -163,7 +177,7 @@ public class Utils {
 
         // Test if viewName is valid
         boolean validView = true;
-        if (StringUtils.isEmpty(viewName)) {
+        if (viewName == null || viewName.length() == 0) {
             validView = false;
             errorMessages.add("view_name can't be empty.");
         } else if (validDB) {
@@ -183,7 +197,7 @@ public class Utils {
                 }
             } catch (StoredProcedureException e) {
                 validView = false;
-                errorMessages.add("view_name = '" + viewName + "' does not exists in '" + databaseName + "' database. " + e.getMessage());
+                errorMessages.add("view_name = '" + viewName + "' does not exists in '" + databaseName + "' database. ");
                 logger.debug("ERROR testViewName() ", e);
             } finally {
                 DBUtils.closeRs(rs);
@@ -193,12 +207,38 @@ public class Utils {
         return validView;
     }
 
+    private static boolean testValidCache(DatabaseEnvironmentImpl databaseEnvironmentImpl, String databaseName,
+                                          String viewName, List<String> errorMessages)
+            throws StoredProcedureException {
+
+        boolean validCache = true;
+
+        boolean isCacheServerEnabled = databaseEnvironmentImpl.isCacheEnabled(
+                databaseName.replaceAll("\"", ""));
+
+        if (!isCacheServerEnabled) {
+            validCache = false;
+            throw new StoredProcedureException("The cache is not enabled in the Server.");
+        }
+
+        boolean isViewCacheFull= isViewCacheEnabledFull(databaseName, viewName);
+
+        if (!isViewCacheFull) {
+            validCache = false;
+            throw new StoredProcedureException("Cache full is not enabled in the view. Please, enable it and try again.");
+        }
+
+        return validCache;
+    }
+
+
+
     private static boolean testLastUpdateCondition(String databaseName, String viewName, String lastUpdateCondition, boolean validDB,
             boolean validView, List<String> errorMessages, Object[] inputValues) throws SQLException {
 
         // Test if lastUpdateCondition is valid
         boolean validLastUpdateCondition = true;
-        if (StringUtils.isEmpty(lastUpdateCondition)) {
+        if (lastUpdateCondition == null || lastUpdateCondition.length() == 0) {
             validLastUpdateCondition = false;
             errorMessages.add("last_update_condition can't be empty.");
         } else if (validDB && validView) {
@@ -238,8 +278,8 @@ public class Utils {
 
         // Test if numElementsInClause is valid
         boolean validNumElementsInClause = true;
-        if (StringUtils.isNotBlank(numElementsInClauseString)) {
-            Integer numElementsInClause = null;
+        if (numElementsInClauseString != null) {
+            Integer numElementsInClause;
             try {
                 numElementsInClause = Integer.valueOf(numElementsInClauseString);
                 if (numElementsInClause.intValue() <= 0) {
@@ -258,4 +298,49 @@ public class Utils {
         return validNumElementsInClause;
     }
 
+    private static boolean isViewCacheEnabledFull(String databaseName, String viewName) throws StoredProcedureException {
+
+        boolean isCacheFull = false;
+        ResultSet rs = null;
+        PreparedStatement ps = null;
+        try {
+            String databaseNameQuotesCleared = databaseName.replace("\"", "");
+            String viewNameQuotesCleared = viewName.replace("\"", "");
+            String[] params = new String[]{databaseNameQuotesCleared, viewNameQuotesCleared};
+            // This needs to be standard SQL as it needs to work in every database that could be configured as cache
+            rs = environment.executeQuery("select cache_status from GET_VIEWS() "
+                    + " where input_database_name = ? and input_name = ? ", params);
+
+            if (rs.next()) {
+                int cacheStatus = rs.getInt(1);
+                if (cacheStatus == CACHE_MODE_FULL) {
+                    isCacheFull = true;
+                }
+            }
+        } catch (StoredProcedureException | SQLException e) {
+            logger.debug("ERROR isViewCacheEnabledFull() ", e);
+            throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e.getMessage());
+        } finally {
+            DBUtils.closeRs(rs);
+            DBUtils.closePs(ps);
+        }
+
+        return isCacheFull;
+    }
+
+    /**
+     * Joins the elements of the list separated by the separator parameter
+     *
+     * @param list
+     * @param separator
+     * @return
+     */
+    public static String join(List<String> list, String separator) {
+        StringBuilder ret = new StringBuilder();
+        for (String string: list) {
+            ret.append(separator).append(string);
+        }
+        // Remove separator from the beginning of the string
+        return ret.toString().substring(separator.length(), ret.length());
+    }
 }

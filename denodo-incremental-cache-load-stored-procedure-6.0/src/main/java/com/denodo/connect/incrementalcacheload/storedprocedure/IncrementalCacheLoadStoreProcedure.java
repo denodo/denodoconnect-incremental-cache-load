@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.DBUtils;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.InputParametersVO;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryListVO;
@@ -106,24 +104,16 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
             final DatabaseEnvironmentImpl databaseEnvironmentImpl = (DatabaseEnvironmentImpl) getEnvironment();
 
-            // Input parameter validation
+            // Input parameter and cache validation
             long startAux = System.nanoTime();
-            Utils.validateInputParameters(environment, databaseEnvironmentImpl, inputValues);
+            Utils.validateInputParametersAndCache(environment, databaseEnvironmentImpl, inputValues);
             long endAux = System.nanoTime();
             double seconds = (endAux - startAux) / 1000000000.0;
-            log(LOG_TRACE, "Time elapsed during parameter validation: \t " + seconds + " seconds.");
+            log(LOG_TRACE, "Time elapsed during validation: \t " + seconds + " seconds.");
 
             // Initialization of variables
             InputParametersVO inputParameters = new InputParametersVO((String) inputValues[0], (String) inputValues[1],
                     (String) inputValues[2], Integer.valueOf((String) inputValues[3]));
-
-            // Check if the cache is enabled before updating
-            boolean isCacheEnabled = databaseEnvironmentImpl.isCacheEnabled(
-                    inputParameters.getDatabaseName().replaceAll("\"", ""));
-
-            if (!isCacheEnabled) {
-                throw new StoredProcedureException("The cache is not enabled in the Server.");
-            }
 
             // Get view PK
             List<String> pkFields = Utils.getPkFieldsByViewNameAndDb(environment,
@@ -157,7 +147,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             // Add a row with the stored procedure out parameter as the stored procedure
             // result
             getProcedureResultSet()
-                    .addRow(new Object[] { new String("Cache Refreshed Successfully. Updated rows:" + queryListVO.getRowCount()) });
+                    .addRow(new Object[] { new String("Cache Refreshed Successfully. Updated rows:"
+                            + queryListVO.getRowCount()) });
 
         } catch (StoredProcedureException | SecurityException | IllegalStateException | SQLException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
@@ -184,21 +175,20 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 log(LOG_TRACE, "Query " + i + "\t: " + seconds + " seconds.");
                 i++;
                 aux.next();                    
-            } catch (Exception e) {
-                log(LOG_DEBUG, "ERROR in getLastModifiedViewDate(): " + e.getMessage());
-                throw new StoredProcedureException("ERROR executing query update of cache: " + q);
+            } catch (SQLException | StoredProcedureException e) {
+                log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q + ". " + e.getMessage());
+                throw new StoredProcedureException("ERROR executing query update of cache:" + e.getMessage());
             } finally {
                 DBUtils.closeRs(aux);                    
             }
-
         }
     }
 
     @SuppressWarnings("boxing")
     private QueryListVO getQueryList(InputParametersVO inputParameters, List<String> pkFields) throws StoredProcedureException {
 
-        String rowValue = StringUtils.EMPTY;
-        String inClauseString = StringUtils.EMPTY;
+        String rowValue = "";
+        String inClauseString = "";
         int pkChunkRowCount = 0;
         int rowCount = 0;
         List<String> pkValuesChunk = new LinkedList<String>();
@@ -206,7 +196,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
         long startAux = System.nanoTime();
 
-        String query = "SELECT DISTINCT " + StringUtils.join(pkFields, ", ") + " FROM " + inputParameters.getDatabaseName() + "."
+        String query = "SELECT DISTINCT " + Utils.join(pkFields, ", ") + " FROM " + inputParameters.getDatabaseName() + "."
                 + inputParameters.getViewName() + " WHERE " + inputParameters.getLastUpdateCondition() + " CONTEXT('cache'='off')";
 
         ResultSet rs = null;
@@ -246,7 +236,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     if (pkChunkRowCount == inputParameters.getNumElementsInClause().intValue() || rs.isLast()) {
 
                         // Creation of the IN clause with the specified chunk: numElementsInClause
-                        inClauseString = StringUtils.join(pkValuesChunk, ",");
+                        inClauseString = Utils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
                         query = "SELECT * FROM " + inputParameters.getDatabaseName() + "." + inputParameters.getViewName() + " WHERE "
@@ -268,7 +258,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     StringBuilder pkJoined = new StringBuilder();
                     pkJoined.append("'");
                     for (int i = 1; i <= pkFields.size(); i++) {
-                        pkJoined.append(rs.getObject(i).toString());
+                        pkJoined.append(rs.getObject(i) != null? rs.getObject(i).toString() : "");
                         if (i < pkFields.size()) {
                             pkJoined.append("-");
                         }
@@ -279,11 +269,11 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     if (pkChunkRowCount == inputParameters.getNumElementsInClause().intValue() || rs.isLast()) {
 
                         // Creation of the IN clause with the specified chunk: numElementsInClause
-                        inClauseString = StringUtils.join(pkValuesChunk, ",");
+                        inClauseString = Utils.join(pkValuesChunk, ",");
 
                         // Cache refresh of PK Chunk
                         query = "SELECT * FROM " + inputParameters.getDatabaseName() + "." + inputParameters.getViewName()
-                                + " WHERE concat(" + StringUtils.join(pkFields, ", '-', ") + ") IN (" + inClauseString + ") "
+                                + " WHERE concat(" + Utils.join(pkFields, ", '-', ") + ") IN (" + inClauseString + ") "
                                 + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
@@ -296,8 +286,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 }
             }
         } catch (Exception e) {
-            log(LOG_DEBUG, "ERROR in getQueryList(): " + e.getMessage());
-            throw new StoredProcedureException("ERROR getting rows to update in cache.");
+            log(LOG_DEBUG, "ERROR in getQueryList(): " + e.getStackTrace());
+            throw new StoredProcedureException("ERROR getting rows to update in cache." + e.getMessage());
         } finally {
             // Close resources
             DBUtils.closeRs(rs);

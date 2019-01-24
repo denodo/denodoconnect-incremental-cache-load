@@ -1,3 +1,9 @@
+[20190124]
+========
+- Fixed #40753 - Add more info when an exception occurs
+- Fixed #41336 - Raise an exception when the view the SP is executed against doesn't have FULL cache enabled
+- Fixed #41239 - Remove commons-lang3 dependency
+
 [20181106]
 ========
 - Fixed #40386 - Error using databases with unicode names
