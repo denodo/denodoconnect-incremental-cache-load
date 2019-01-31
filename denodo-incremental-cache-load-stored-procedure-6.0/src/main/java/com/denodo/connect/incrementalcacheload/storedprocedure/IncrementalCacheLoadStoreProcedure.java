@@ -115,6 +115,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             InputParametersVO inputParameters = new InputParametersVO((String) inputValues[0], (String) inputValues[1],
                     (String) inputValues[2], Integer.valueOf((String) inputValues[3]));
 
+            log(LOG_DEBUG, "Input parameters: " + inputParameters.toString());
+
             // Get view PK
             List<String> pkFields = Utils.getPkFieldsByViewNameAndDb(environment,
                     inputParameters.getDatabaseName().replaceAll("\"", ""),
@@ -202,6 +204,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         ResultSet rs = null;
         try {
 
+            log(LOG_DEBUG, "getQueryList(): query = " + query);
             rs = this.environment.executeQuery(query);
             long endAux = System.nanoTime();
             double seconds = (endAux - startAux) / 1000000000.0;
@@ -293,6 +296,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             DBUtils.closeRs(rs);
         }
 
+        log(LOG_DEBUG, "getQueryList(): queryList = " + queryList.toString());
         return new QueryListVO(rowCount, queryList);
     }
 

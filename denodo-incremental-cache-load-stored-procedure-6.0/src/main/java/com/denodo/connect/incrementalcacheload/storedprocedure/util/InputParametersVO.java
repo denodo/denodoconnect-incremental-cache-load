@@ -51,4 +51,13 @@ public class InputParametersVO {
         this.numElementsInClause = numElementsInClause;
     }
 
+    @Override
+    public String toString() {
+        return "InputParametersVO{" +
+                "databaseName='" + databaseName + '\'' +
+                ", viewName='" + viewName + '\'' +
+                ", lastUpdateCondition='" + lastUpdateCondition + '\'' +
+                ", numElementsInClause=" + numElementsInClause +
+                '}';
+    }
 }

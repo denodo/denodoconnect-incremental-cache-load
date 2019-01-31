@@ -79,6 +79,7 @@ public class Utils {
 
         ResultSet rs = null;
         try {
+            logger.debug("getPkFieldsByViewNameAndDb(): " + query);
             rs = environment.executeQuery(query.toString());
 
             while (rs.next()) {
@@ -98,6 +99,7 @@ public class Utils {
                     "The view " + viewName + " from the DB " + databaseName + " has no primary key. Cache won't be updated");
         }
 
+        logger.debug("pk fields: " + pkFields.toString());
         return pkFields;
     }
 
@@ -135,6 +137,7 @@ public class Utils {
             DBUtils.closeConn(cacheConnection);
         }
 
+        logger.debug("getLastModifiedViewDate(): dateString = " + dateString);
         return dateString;
     }
 
@@ -153,9 +156,10 @@ public class Utils {
                 // statement. So if the viewName comes rounded by double quotes ("") they must
                 // be removed
                 String databaseNameQuotesCleared = databaseName.replace("\"", "");
-                rs = environment
-                        .executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
-                                + databaseNameQuotesCleared + "', null) LIMIT 1");
+                String query = "SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
+                        + databaseNameQuotesCleared + "', null) LIMIT 1";
+                logger.debug("testDatabaseName(): " + query);
+                rs = environment.executeQuery(query);
                 // The query returns no rows if there is no database with the provided name
                 if (!rs.next()) {
                     throw new StoredProcedureException();
@@ -188,8 +192,10 @@ public class Utils {
                 // be removed
                 String databaseNameQuotesCleared = databaseName.replace("\"", "");
                 String viewNameQuotesCleared = viewName.replace("\"", "");
-                rs = environment.executeQuery("SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
-                        + databaseNameQuotesCleared + "', '" + viewNameQuotesCleared + "') LIMIT 1");
+                String query = "SELECT input_database_name FROM CATALOG_VDP_METADATA_VIEWS('"
+                        + databaseNameQuotesCleared + "', '" + viewNameQuotesCleared + "') LIMIT 1";
+                logger.debug("testViewName(): " + query);
+                rs = environment.executeQuery(query);
                 // The query returns no rows if there is no view in the database with the
                 // provided parameters
                 if (!rs.next()) {
@@ -257,8 +263,10 @@ public class Utils {
 
                 }
 
-                rs = environment.executeQuery("select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition
-                        + " fetch first 1 rows only CONTEXT ('cache' = 'on')");
+                String query = "select 1 from " + databaseName + "." + viewName + " where " + lastUpdateCondition
+                        + " fetch first 1 rows only CONTEXT ('cache' = 'on')";
+                logger.debug("testLastUpdateCondition(): " + query);
+                rs = environment.executeQuery(query);
 
             } catch (StoredProcedureException e) {
                 validLastUpdateCondition = false;
@@ -308,8 +316,9 @@ public class Utils {
             String viewNameQuotesCleared = viewName.replace("\"", "");
             String[] params = new String[]{databaseNameQuotesCleared, viewNameQuotesCleared};
             // This needs to be standard SQL as it needs to work in every database that could be configured as cache
-            rs = environment.executeQuery("select cache_status from GET_VIEWS() "
-                    + " where input_database_name = ? and input_name = ? ", params);
+            String query = "select cache_status from GET_VIEWS() where input_database_name = ? and input_name = ? ";
+            logger.debug("isViewCacheEnabledFull: " + query);
+            rs = environment.executeQuery(query, params);
 
             if (rs.next()) {
                 int cacheStatus = rs.getInt(1);
