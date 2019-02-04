@@ -1,4 +1,4 @@
-[20190124]
+[20190204]
 ========
 - Fixed #40753 - Add more info when an exception occurs
 - Fixed #41336 - Raise an exception when the view the SP is executed against doesn't have FULL cache enabled
