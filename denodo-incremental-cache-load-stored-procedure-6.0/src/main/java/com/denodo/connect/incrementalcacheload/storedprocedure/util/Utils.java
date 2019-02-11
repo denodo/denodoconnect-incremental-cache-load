@@ -252,6 +252,8 @@ public class Utils {
             ResultSet rs = null;
             try {
                 // Special case: @LASTCACHEREFRESH
+                // We make it case insensitive
+                lastUpdateCondition = lastUpdateCondition.toUpperCase();
                 if (lastUpdateCondition.contains(LAST_CACHE_REFRESH)) {
                     // To update tuples since last cache refresh, we check the max value of
                     // modified date in the cache itself
