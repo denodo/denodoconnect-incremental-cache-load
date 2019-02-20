@@ -313,7 +313,6 @@ public class Utils {
 
         boolean isCacheFull = false;
         ResultSet rs = null;
-        PreparedStatement ps = null;
         try {
             String databaseNameQuotesCleared = databaseName.replace("\"", "");
             String viewNameQuotesCleared = viewName.replace("\"", "");
@@ -334,7 +333,6 @@ public class Utils {
             throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e.getMessage(), e);
         } finally {
             DBUtils.closeRs(rs);
-            DBUtils.closePs(ps);
         }
 
         return isCacheFull;
