@@ -152,9 +152,12 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                     .addRow(new Object[] { new String("Cache Refreshed Successfully. Updated rows:"
                             + queryListVO.getRowCount()) });
 
-        } catch (StoredProcedureException | SecurityException | IllegalStateException | SQLException e) {
+        } catch (StoredProcedureException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
-            throw new StoredProcedureException(e);
+            throw e;
+        } catch (Throwable t) {
+            this.environment.log(LOG_ERROR, t.getMessage());
+            throw new StoredProcedureException(t);
         } finally {
             long end = System.nanoTime();
             double seconds = (end - start) / 1000000000.0;
