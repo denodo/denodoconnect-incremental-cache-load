@@ -155,11 +155,11 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         } catch (StoredProcedureException | SecurityException | IllegalStateException | SQLException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
             throw new StoredProcedureException(e);
+        } finally {
+            long end = System.nanoTime();
+            double seconds = (end - start) / 1000000000.0;
+            log(LOG_DEBUG, "END of the Incremental Cache Load SP. Time elapsed: \t " + seconds + " seconds.");
         }
-
-        long end = System.nanoTime();
-        double seconds = (end - start) / 1000000000.0;
-        log(LOG_DEBUG, "END of the Incremental Cache Load SP. Time elapsed: \t " + seconds + " seconds.");
 
     }
 
@@ -178,8 +178,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 i++;
                 aux.next();                    
             } catch (SQLException | StoredProcedureException e) {
-                log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q + ". " + e.getMessage());
-                throw new StoredProcedureException("ERROR executing query update of cache:" + e.getMessage());
+                log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q + ". " + e);
+                throw new StoredProcedureException("ERROR executing query update of cache:" + e);
             } finally {
                 DBUtils.closeRs(aux);                    
             }
@@ -289,8 +289,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 }
             }
         } catch (Exception e) {
-            log(LOG_DEBUG, "ERROR in getQueryList(): " + e.getStackTrace());
-            throw new StoredProcedureException("ERROR getting rows to update in cache." + e.getMessage());
+            log(LOG_DEBUG, "ERROR in getQueryList(): " + e);
+            throw new StoredProcedureException("ERROR getting rows to update in cache.", e);
         } finally {
             // Close resources
             DBUtils.closeRs(rs);

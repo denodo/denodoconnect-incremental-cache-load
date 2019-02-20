@@ -88,7 +88,7 @@ public class Utils {
             }
         } catch (SQLException e) {
             logger.debug("ERROR in getPkFieldsByViewNameAndDb(): ", e);
-            throw new StoredProcedureException("ERROR getting view PK" + e.getMessage());
+            throw new StoredProcedureException("ERROR getting view PK" + e);
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
@@ -129,12 +129,13 @@ public class Utils {
             }
         } catch (SQLException e) {
             logger.debug("ERROR in getLastModifiedViewDate(): ", e);
-            throw new StoredProcedureException("ERROR getting last modified view date" + e.getMessage());
+            throw new StoredProcedureException("ERROR getting last modified view date: " + e);
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
             DBUtils.closePs(ps);
-            DBUtils.closeConn(cacheConnection);
+            // We don't close the cache connection because it isn't a pool and we don't need to do it (#41972)
+            // DBUtils.closeConn(cacheConnection);
         }
 
         logger.debug("getLastModifiedViewDate(): dateString = " + dateString);
@@ -253,7 +254,7 @@ public class Utils {
             try {
                 // Special case: @LASTCACHEREFRESH
                 // We make it case insensitive
-                lastUpdateCondition = lastUpdateCondition.toUpperCase();
+                lastUpdateCondition = lastUpdateCondition.replaceAll("(?i)" + LAST_CACHE_REFRESH, LAST_CACHE_REFRESH);
                 if (lastUpdateCondition.contains(LAST_CACHE_REFRESH)) {
                     // To update tuples since last cache refresh, we check the max value of
                     // modified date in the cache itself
@@ -274,7 +275,7 @@ public class Utils {
                 validLastUpdateCondition = false;
                 errorMessages.add("last_update_condition = '" + lastUpdateCondition + "' is not valid. Alternatively, " +
                         "if you are calling this stored procedure on a view/database with an unicode-based name, please " +
-                        "check that you have specified its name surrounded with double-quotes." + e.getMessage());
+                        "check that you have specified its name surrounded with double-quotes. " + e.getMessage());
                 logger.debug("ERROR testLastUpdateCondition() ", e);
             } finally {
                 DBUtils.closeRs(rs);
@@ -330,7 +331,7 @@ public class Utils {
             }
         } catch (StoredProcedureException | SQLException e) {
             logger.debug("ERROR isViewCacheEnabledFull() ", e);
-            throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e.getMessage());
+            throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e);
         } finally {
             DBUtils.closeRs(rs);
             DBUtils.closePs(ps);
