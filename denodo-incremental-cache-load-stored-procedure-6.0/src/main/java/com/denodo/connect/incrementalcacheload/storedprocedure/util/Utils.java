@@ -88,7 +88,7 @@ public class Utils {
             }
         } catch (SQLException e) {
             logger.debug("ERROR in getPkFieldsByViewNameAndDb(): ", e);
-            throw new StoredProcedureException("ERROR getting view PK" + e);
+            throw new StoredProcedureException("ERROR getting view PK: " + e.getMessage(), e);
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
@@ -129,7 +129,7 @@ public class Utils {
             }
         } catch (SQLException e) {
             logger.debug("ERROR in getLastModifiedViewDate(): ", e);
-            throw new StoredProcedureException("ERROR getting last modified view date: " + e);
+            throw new StoredProcedureException("ERROR getting last modified view date: " + e.getMessage(), e);
         } finally {
             // Close resources
             DBUtils.closeRs(rs);
@@ -331,7 +331,7 @@ public class Utils {
             }
         } catch (StoredProcedureException | SQLException e) {
             logger.debug("ERROR isViewCacheEnabledFull() ", e);
-            throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e);
+            throw new StoredProcedureException("ERROR isViewCacheEnabledFull() " + e.getMessage(), e);
         } finally {
             DBUtils.closeRs(rs);
             DBUtils.closePs(ps);
