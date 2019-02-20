@@ -1,6 +1,6 @@
 [20190220]
 ========
-- Fixed #41972 - Closing resources optimization
+- Fixed #41972 - Log and exceptions optimizations
 
 [20190204]
 ========

@@ -134,8 +134,7 @@ public class Utils {
             // Close resources
             DBUtils.closeRs(rs);
             DBUtils.closePs(ps);
-            // We don't close the cache connection because it isn't a pool and we don't need to do it (#41972)
-            // DBUtils.closeConn(cacheConnection);
+            DBUtils.closeConn(cacheConnection);
         }
 
         logger.debug("getLastModifiedViewDate(): dateString = " + dateString);
