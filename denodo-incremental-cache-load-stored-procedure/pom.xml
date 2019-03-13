@@ -29,9 +29,10 @@
     <artifactId>denodo-incremental-cache-load-6.0</artifactId>
     <name>${project.artifactId}</name>
     <packaging>jar</packaging>
+	<description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
     <version>20190220</version>
 
-    <description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
+
 
     <licenses>
         <license>
