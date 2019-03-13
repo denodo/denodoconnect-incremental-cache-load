@@ -52,7 +52,45 @@
         <project.build.sourceEncoding>US-ASCII</project.build.sourceEncoding>
         <maven.compile.source>7</maven.compile.source>
         <maven.compile.target>7</maven.compile.target>
+        <errorprone.java.version>1.8</errorprone.java.version>
+        <errorprone.javac.version>9+181-r4173-1</errorprone.javac.version>
+        <errorprone.core.version>2.3.2</errorprone.core.version>
     </properties>
+    <!-- *************************** -->
+    <!-- PROFILES -->
+    <!-- *************************** -->
+    <profiles>
+        <profile>
+            <id>errorprone</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.8.0</version>
+                        <configuration>
+                            <source>${errorprone.java.version}</source>
+                            <target>${errorprone.java.version}</target>
+                            <fork>true</fork>
+                            <compilerArgs>
+                                <arg>-XDcompilePolicy=simple</arg>
+                                <arg>-Xplugin:ErrorProne</arg>
+                                <arg>-J-Xbootclasspath/p:${settings.localRepository}/com/google/errorprone/javac/${errorprone.javac.version}/javac-${errorprone.javac.version}.jar</arg>
+                            </compilerArgs>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>com.google.errorprone</groupId>
+                                    <artifactId>error_prone_core</artifactId>
+                                    <version>${errorprone.core.version}</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 
 
     <build>
