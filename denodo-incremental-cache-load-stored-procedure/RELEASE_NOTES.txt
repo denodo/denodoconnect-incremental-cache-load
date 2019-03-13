@@ -1,3 +1,7 @@
+currentversion
+========
+- Added #42313 -  Improve code quality tooling
+
 [20190220]
 ========
 - Fixed #41972 - Log and exceptions optimizations
