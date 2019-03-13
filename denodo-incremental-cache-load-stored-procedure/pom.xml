@@ -26,12 +26,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.denodo.connect.incrementalcacheload</groupId>
-    <artifactId>denodo-incremental-cache-load-6.0</artifactId>
+    <artifactId>denodo-incremental-cache-load-7.0</artifactId>
     <name>${project.artifactId}</name>
+	<description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
     <packaging>jar</packaging>
     <version>20190220</version>
 
-    <description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
+    
 
     <licenses>
         <license>
@@ -58,9 +59,6 @@
 
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
-            </resource>
-            <resource>
                 <directory>.</directory>
                 <targetPath>META-INF</targetPath>
                 <includes>
@@ -68,21 +66,13 @@
                     <include>NOTICE.txt</include>
                 </includes>
             </resource>
-            <resource>
-                <directory>src/main/java</directory>
-                <includes>
-                    <include>**/*.properties</include>
-                    <include>**/*.xml</include>
-                    <include>**/*.html</include>
-                </includes>
-            </resource>
         </resources>
 
-        <testResources>
-            <testResource>
-                <directory>src/test/resources</directory>
-            </testResource>
-        </testResources>
+
+        <sourceDirectory>../denodo-incremental-cache-load-stored-procedure-6.0/src/main/java</sourceDirectory>
+
+        <testSourceDirectory>../denodo-incremental-cache-load-stored-procedure-7.0/src/test/java</testSourceDirectory>
+        <testOutputDirectory>../denodo-incremental-cache-load-stored-procedure-7.0/target/test-classes</testOutputDirectory>
 
         <plugins>
 
@@ -104,6 +94,20 @@
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>
@@ -132,32 +136,18 @@
                         <manifestSections>
                             <manifestSection>
                                 <name>com.denodo</name>
-                                <manifestEntries>
+                                <manifestEntries>                            
                                     <Extension-Name>${project.artifactId}</Extension-Name>
                                     <Extension-Description>${project.name}</Extension-Description>
                                     <Extension-Version>${project.version}</Extension-Version>
-                                    <Extension-Target-Version>6.0</Extension-Target-Version>
-                                    <Extension-Target-Update>20180618</Extension-Target-Update>
+                                    <Extension-Target-Version>7.0</Extension-Target-Version>
+                                    <Extension-Target-Update>20180611</Extension-Target-Update>
                                     <Extension-Website>http://support.denodo.com</Extension-Website>
-                                </manifestEntries>
+                                 </manifestEntries>
                             </manifestSection>
-                        </manifestSections>
+                        </manifestSections>                            
                     </archive>
                 </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
 
             <plugin>
@@ -268,7 +258,7 @@
             <artifactId>log4j</artifactId>
             <version>1.2.15</version>
         </dependency>
-
+        
     </dependencies>
 
 </project>
