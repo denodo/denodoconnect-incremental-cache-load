@@ -107,10 +107,8 @@
         </resources>
 
 
-        <sourceDirectory>../denodo-incremental-cache-load-stored-procedure-6.0/src/main/java</sourceDirectory>
-
-        <testSourceDirectory>../denodo-incremental-cache-load-stored-procedure-7.0/src/test/java</testSourceDirectory>
-        <testOutputDirectory>../denodo-incremental-cache-load-stored-procedure-7.0/target/test-classes</testOutputDirectory>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
+        <testOutputDirectory>target/test-classes</testOutputDirectory>
 
         <plugins>
 
