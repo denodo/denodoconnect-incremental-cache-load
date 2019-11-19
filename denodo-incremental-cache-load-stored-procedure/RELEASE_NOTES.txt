@@ -1,5 +1,6 @@
-currentversion
+[20191119]
 ========
+- Fixed #45938 - PK with multiple fields and timestamps
 - Added #42313 -  Improve code quality tooling
 
 [20190220]
