@@ -30,7 +30,7 @@
     <name>${project.artifactId}</name>
 	<description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
     <packaging>jar</packaging>
-    <version>20191119</version>
+    <version>20191121</version>
 
     
 
