@@ -2,17 +2,14 @@ package com.denodo.connect.incrementalcacheload.storedprocedure;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Time;
 import java.sql.Types;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedList;
 import java.util.List;
 
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.DBUtils;
-import com.denodo.connect.incrementalcacheload.storedprocedure.util.DateUtils;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.InputParametersVO;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryListVO;
+import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryParameters;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.Utils;
 import com.denodo.vdb.engine.storedprocedure.AbstractStoredProcedure;
 import com.denodo.vdb.engine.storedprocedure.DatabaseEnvironment;
@@ -149,7 +146,8 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             // Add a row with the stored procedure out parameter as the stored procedure
             // result
             getProcedureResultSet()
-                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows:" + queryListVO.getRowCount()});
+                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows (distinct PK values):"
+                    + queryListVO.getRowCount()});
 
         } catch (StoredProcedureException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
@@ -165,15 +163,15 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
     }
 
-    private void executeUpdateCache(List<String> queryList) throws StoredProcedureException {
+    private void executeUpdateCache(List<QueryParameters> queryList) throws StoredProcedureException {
 
         ResultSet aux = null;
         int i = 1;
 
-        for (String q : queryList) {
+        for (QueryParameters q : queryList) {
             try {
                 long iniCache = System.nanoTime();
-                aux = this.environment.executeQuery(q);
+                aux = this.environment.executeQuery(q.getQuery(), q.getParameters());
                 long finCache = System.nanoTime();
                 double seconds = (finCache - iniCache) / 1000000000.0;
                 log(LOG_TRACE, "Query " + i + "\t: " + seconds + " seconds.");
@@ -181,31 +179,27 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 aux.next();
             } catch (SQLException | StoredProcedureException e) {
                 log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q + ". " + e);
-                throw new StoredProcedureException("ERROR executing query update of cache:" + e);
+                throw new StoredProcedureException("ERROR executing query update of cache:", e);
             } finally {
                 DBUtils.closeRs(aux);
             }
         }
     }
 
-    @SuppressWarnings("boxing")
+
     private QueryListVO getQueryList(InputParametersVO inputParameters, List<String> pkFields)
         throws StoredProcedureException {
 
-        String rowValue = "";
-        String inClauseString = "";
-        int pkChunkRowCount = 0;
-        int rowCount = 0;
-        List<String> pkValuesChunk = new LinkedList<>();
-        List<String> queryList = new ArrayList<>();
-
         long startAux = System.nanoTime();
-
+        // This query obtains all the PK values that match the input condition.
+        // They will be used to create the queries to update the cache.
         String query =
             "SELECT DISTINCT " + Utils.join(pkFields, ", ") + " FROM " + inputParameters.getDatabaseName() + "."
                 + inputParameters.getViewName() + " WHERE " + inputParameters.getLastUpdateCondition()
                 + " CONTEXT('cache'='off')";
 
+        int rowCount = 0;
+        List<QueryParameters> queryList = new ArrayList<>();
         ResultSet rs = null;
         try {
 
@@ -215,102 +209,85 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             double seconds = (endAux - startAux) / 1000000000.0;
             log(LOG_TRACE, "Time elapsed recovering PKs: \t " + seconds + " seconds.");
 
-            // Variable used to check if we need quotes around the values in the IN clause
-            // in singlePK context
+
+            //  Variables used to create the query list
+            // Stores the value of the current parameter
+            Object rowValue;
+            // Used to add a number of elements equal to the 'num_elements_in_clause' input SP parameter
+            int pkChunkRowCount = 0;
+            // List of parameters that will be passed in the query execution
+            List<Object> parameters = new ArrayList<>();
+            // List of question marks for the IN clause
+            StringBuilder inClauseParameters = new StringBuilder();
+            boolean firstParameter = true;
+            // Contains the list of OR clauses for the multiple PK cases
+            StringBuilder orClauseParameters = new StringBuilder();
+            String orClause = null;
             boolean singlePk = pkFields.size() == 1;
-            Boolean isNumericPK = null;
-            boolean updatedPKFieldsFormat = false;
 
             while (rs.next()) {
 
                 rowCount++;
                 pkChunkRowCount++;
 
+                // We have two ways of building the cache update queries:
+                //  1) The PK is simple -> IN clause with a list of parameters (?)
+                //  2) The PK is multiple -> Sequence of OR clauses with (pk_field1 = val1 AND pk_field2 = val2...)
                 if (singlePk) {
 
                     // PK is one only field
-
-                    // We check the type only once
-                    if (isNumericPK == null) {
-                        isNumericPK = rs.getObject(1) instanceof Number;
+                    rowValue = rs.getObject(1) != null ? rs.getObject(1) : "";
+                    parameters.add(rowValue);
+                    if (firstParameter) {
+                        firstParameter = false;
+                    } else {
+                        inClauseParameters.append(",");
                     }
-
-                    rowValue = rs.getObject(1) != null ? rs.getObject(1).toString() : "";
-                    if (!isNumericPK) {
-                        // If the type is not numeric, we surround the value with quotes
-                        rowValue = "'" + rowValue + "'";
-                    }
-                    pkValuesChunk.add(rowValue);
+                    inClauseParameters.append("?");
 
                     if (pkChunkRowCount == inputParameters.getNumElementsInClause() || rs.isLast()) {
-
-                        // Creation of the IN clause with the specified chunk: numElementsInClause
-                        inClauseString = Utils.join(pkValuesChunk, ",");
-
-                        // Cache refresh of PK Chunk
                         query =
                             "SELECT * FROM " + inputParameters.getDatabaseName() + "." + inputParameters.getViewName()
                                 + " WHERE "
-                                + pkFields.get(0) + " IN (" + inClauseString + ") "
+                                + pkFields.get(0) + " IN (" + inClauseParameters.toString() + ") "
                                 + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
-                        queryList.add(query);
+                        queryList.add(buildQueryParameters(query, parameters));
 
-                        // Reset the chunk
+                        // Reset aux variables
+                        firstParameter = true;
                         pkChunkRowCount = 0;
-                        pkValuesChunk.clear();
+                        parameters.clear();
+                        inClauseParameters.setLength(0);
                     }
 
                 } else {
 
-                    // PK has two or more fields. We build a "full key" concatenating them all,
-                    // using "-" as separator.
-                    StringBuilder pkJoined = new StringBuilder();
-                    pkJoined.append("'");
-                    boolean first = true;
-                    for (int i = 0; i < pkFields.size(); i++) {
-                        if (!first) {
-                            pkJoined.append("-");
-                        } else {
-                            first = false;
-                        }
-                        Object originalValue =
-                            rs.getObject(i + 1) != null ? rs.getObject(i + 1) : "";
-                        // If it's a date field type, we need to modify the pkField in the query with FORMATDATE and
-                        // format the date values with the same pattern so the IN clause can match properly the values
-                        if (originalValue instanceof Date) {
-                            if (!updatedPKFieldsFormat) {
-                                String pkDateField =
-                                    "FORMATDATE ( " + "'" + getDatePattern(originalValue) + "', " + pkFields.get(i) + ")";
-                                pkFields.set(i, pkDateField);
-                                updatedPKFieldsFormat = true;
-                            }
-                            pkJoined.append(getDateTypeStringValue(originalValue));
-                        } else {
-                            pkJoined.append(originalValue);
-                        }
+                    // PK has two or more fields
+                    if (orClause == null) {
+                        orClause = createOrClause(pkFields);
                     }
-                    pkJoined.append("'");
-                    pkValuesChunk.add(pkJoined.toString());
+                    buildOrCondition(pkFields, rs, orClauseParameters, orClause, parameters);
 
                     if (pkChunkRowCount == inputParameters.getNumElementsInClause() || rs.isLast()) {
 
-                        // Creation of the IN clause with the specified chunk: numElementsInClause
-                        inClauseString = Utils.join(pkValuesChunk, ",");
-
                         // Cache refresh of PK Chunk
-                        query =
-                            "SELECT * FROM " + inputParameters.getDatabaseName() + "." + inputParameters.getViewName()
-                                + " WHERE concat(" + Utils.join(pkFields, ", '-', ") + ") IN (" + inClauseString + ") "
-                                + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
-                                + "'returnqueryresults'='false','cache_wait_for_load'='true')";
+                        query = "SELECT * FROM " + inputParameters.getDatabaseName() + "." + inputParameters.getViewName()
+                            + " WHERE " + orClauseParameters.toString()
+                            + " CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
+                            + " 'returnqueryresults'='false','cache_wait_for_load'='true')";
 
-                        queryList.add(query);
+                        queryList.add(buildQueryParameters(query, parameters));
 
-                        // Reset the chunk
+                        // Reset aux variables
                         pkChunkRowCount = 0;
-                        pkValuesChunk.clear();
+                        orClauseParameters = new StringBuilder();
+                        parameters.clear();
+
+                    } else {
+                        // There are more conditions to append
+                        orClauseParameters.append("OR");
                     }
                 }
             }
@@ -326,21 +303,33 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         return new QueryListVO(rowCount, queryList);
     }
 
-    private String getDatePattern(Object o) {
-        if (o instanceof Time) {
-            return DateUtils.getTimeFormat().toPattern();
-        }
-        return DateUtils.getDateFormat().toPattern();
+    private QueryParameters buildQueryParameters(String query, List<Object> parameters) {
+        QueryParameters queryParameters = new QueryParameters();
+        queryParameters.setQuery(query);
+        queryParameters.setParameters(parameters.toArray());
+        return queryParameters;
     }
 
-    private String getDateTypeStringValue(Object o) {
-        // Fix for dates
-        if (o instanceof Time) {
-            return DateUtils.millisecondsToStringTime(((Date) o).getTime());
-        } else if (o instanceof Date){
-            return DateUtils.millisecondsToStringDate(((Date) o).getTime());
+    private String createOrClause(List<String> pkFields) {
+        List<String> conditions = new ArrayList<>();
+        for (String pkField : pkFields) {
+            conditions.add(pkField + " = ? ");
         }
-        return o.toString();
+        // Build an OR clause with all the PK elements splitted by the AND clause
+        return " (" + Utils.join(conditions, " AND ") + ") ";
+    }
+
+    private void buildOrCondition(List<String> pkFields, ResultSet rs,
+        StringBuilder orClauseParameters, String orClause, List<Object> parameters) throws SQLException {
+
+        // 1. Add OR clause to where
+        // The OR clause is always the same. We only need to calculate it once and then append it the requested times
+        orClauseParameters.append(orClause);
+
+        // 2. Add parameter values to parameter list
+        for (int i = 0; i < pkFields.size(); i++) {
+            parameters.add(rs.getObject(i + 1));
+        }
     }
 
     @Override

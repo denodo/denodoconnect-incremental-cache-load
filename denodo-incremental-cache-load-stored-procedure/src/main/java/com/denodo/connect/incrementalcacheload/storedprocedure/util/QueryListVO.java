@@ -3,16 +3,15 @@ package com.denodo.connect.incrementalcacheload.storedprocedure.util;
 import java.util.List;
 
 public class QueryListVO {
-
     private int rowCount;
-    private List<String> queryList;
+    private List<QueryParameters> queryList;
 
     public QueryListVO() {
         super();
     }
 
-    public QueryListVO(int rowCount, List<String> queryList) {
-        super();
+    public QueryListVO(int rowCount,
+        List<QueryParameters> queryList) {
         this.rowCount = rowCount;
         this.queryList = queryList;
     }
@@ -25,12 +24,12 @@ public class QueryListVO {
         this.rowCount = rowCount;
     }
 
-    public List<String> getQueryList() {
-        return this.queryList;
+    public List<QueryParameters> getQueryList() {
+        return queryList;
     }
 
-    public void setQueryList(List<String> queryList) {
+    public void setQueryList(
+        List<QueryParameters> queryList) {
         this.queryList = queryList;
     }
-
 }

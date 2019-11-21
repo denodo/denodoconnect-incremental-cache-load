@@ -213,28 +213,22 @@ public class Utils {
         return validView;
     }
 
-    private static boolean testValidCache(DatabaseEnvironmentImpl databaseEnvironmentImpl, String databaseName,
+    private static void testValidCache(DatabaseEnvironmentImpl databaseEnvironmentImpl, String databaseName,
                                           String viewName, List<String> errorMessages)
             throws StoredProcedureException {
-
-        boolean validCache = true;
 
         boolean isCacheServerEnabled = databaseEnvironmentImpl.isCacheEnabled(
                 databaseName.replaceAll("\"", ""));
 
         if (!isCacheServerEnabled) {
-            validCache = false;
             throw new StoredProcedureException("The cache is not enabled in the Server.");
         }
 
         boolean isViewCacheFull= isViewCacheEnabledFull(databaseName, viewName);
 
         if (!isViewCacheFull) {
-            validCache = false;
             throw new StoredProcedureException("Cache full is not enabled in the view. Please, enable it and try again.");
         }
-
-        return validCache;
     }
 
 
