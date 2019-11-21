@@ -1,3 +1,7 @@
+[20191121]
+========
+- Added #45939 - Change the way we deal with PKs with multiple fields
+
 [20191119]
 ========
 - Fixed #45938 - PK with multiple fields and timestamps
