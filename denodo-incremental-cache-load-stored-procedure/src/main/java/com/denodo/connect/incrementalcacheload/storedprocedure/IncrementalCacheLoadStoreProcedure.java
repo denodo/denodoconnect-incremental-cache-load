@@ -7,8 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.DBUtils;
+import com.denodo.connect.incrementalcacheload.storedprocedure.util.IncrementalCacheLoadStoreProcedureException;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.InputParametersVO;
-import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryListVO;
+import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryList;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.QueryParameters;
 import com.denodo.connect.incrementalcacheload.storedprocedure.util.Utils;
 import com.denodo.vdb.engine.storedprocedure.AbstractStoredProcedure;
@@ -127,7 +128,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             log(LOG_TRACE, "BEGIN of the building of the query array.");
             startAux = System.nanoTime();
 
-            QueryListVO queryListVO = getQueryList(inputParameters, pkFields);
+            QueryList queryList = getQueryList(inputParameters, pkFields);
 
             endAux = System.nanoTime();
             seconds = (endAux - startAux) / 1000000000.0;
@@ -137,7 +138,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             log(LOG_TRACE, "START of cache update");
             startAux = System.nanoTime();
 
-            executeUpdateCache(queryListVO.getQueryList());
+            executeUpdateCache(queryList);
 
             endAux = System.nanoTime();
             seconds = (endAux - startAux) / 1000000000.0;
@@ -146,10 +147,10 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             // Add a row with the stored procedure out parameter as the stored procedure
             // result
             getProcedureResultSet()
-                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows (distinct PK values):"
-                    + queryListVO.getRowCount()});
+                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows (distinct PK values): "
+                    + queryList.getRowCount()});
 
-        } catch (StoredProcedureException e) {
+        } catch (IncrementalCacheLoadStoreProcedureException e) {
             this.environment.log(LOG_ERROR, e.getMessage());
             throw e;
         } catch (Exception e) {
@@ -163,12 +164,13 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
 
     }
 
-    private void executeUpdateCache(List<QueryParameters> queryList) throws StoredProcedureException {
+    private void executeUpdateCache(QueryList queryList) throws StoredProcedureException {
 
         ResultSet aux = null;
         int i = 1;
+        int updated = 0;
 
-        for (QueryParameters q : queryList) {
+        for (QueryParameters q : queryList.getQueryList()) {
             try {
                 long iniCache = System.nanoTime();
                 aux = this.environment.executeQuery(q.getQuery(), q.getParameters());
@@ -177,9 +179,17 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 log(LOG_TRACE, "Query " + i + "\t: " + seconds + " seconds.");
                 i++;
                 aux.next();
+                // Count of the updated PKs at this point
+                updated = updated + q.getChunkSize();
+                // TODO: 22/11/2019 test error
+                if (updated >= 20) {
+                    throw new StoredProcedureException("test chunk");
+                }
             } catch (SQLException | StoredProcedureException e) {
-                log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q + ". " + e);
-                throw new StoredProcedureException("ERROR executing query update of cache:", e);
+                log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q
+                    + " [Rows updated in cache: " + updated +"]. " + e);
+                throw new IncrementalCacheLoadStoreProcedureException(
+                    "ERROR executing query update of cache [Rows updated in cache: " + updated + "].", e, updated);
             } finally {
                 DBUtils.closeRs(aux);
             }
@@ -187,7 +197,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
     }
 
 
-    private QueryListVO getQueryList(InputParametersVO inputParameters, List<String> pkFields)
+    private QueryList getQueryList(InputParametersVO inputParameters, List<String> pkFields)
         throws StoredProcedureException {
 
         long startAux = System.nanoTime();
@@ -253,7 +263,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                                 + "CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                                 + "'returnqueryresults'='false','cache_wait_for_load'='true')";
 
-                        queryList.add(buildQueryParameters(query, parameters));
+                        queryList.add(buildQueryParameters(query, parameters, pkChunkRowCount));
 
                         // Reset aux variables
                         firstParameter = true;
@@ -278,7 +288,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                             + " CONTEXT('cache_preload'='true','cache_invalidate'='matching_rows',"
                             + " 'returnqueryresults'='false','cache_wait_for_load'='true')";
 
-                        queryList.add(buildQueryParameters(query, parameters));
+                        queryList.add(buildQueryParameters(query, parameters, pkChunkRowCount));
 
                         // Reset aux variables
                         pkChunkRowCount = 0;
@@ -300,13 +310,14 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
         }
 
         log(LOG_DEBUG, "getQueryList(): queryList = " + queryList.toString());
-        return new QueryListVO(rowCount, queryList);
+        return new QueryList(rowCount, queryList);
     }
 
-    private QueryParameters buildQueryParameters(String query, List<Object> parameters) {
+    private QueryParameters buildQueryParameters(String query, List<Object> parameters, int pkChunkRowCount) {
         QueryParameters queryParameters = new QueryParameters();
         queryParameters.setQuery(query);
         queryParameters.setParameters(parameters.toArray());
+        queryParameters.setChunkSize(pkChunkRowCount);
         return queryParameters;
     }
 
