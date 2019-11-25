@@ -2,16 +2,15 @@ package com.denodo.connect.incrementalcacheload.storedprocedure.util;
 
 import java.util.List;
 
-public class QueryListVO {
+public class QueryList {
     private int rowCount;
     private List<QueryParameters> queryList;
 
-    public QueryListVO() {
+    public QueryList() {
         super();
     }
 
-    public QueryListVO(int rowCount,
-        List<QueryParameters> queryList) {
+    public QueryList(int rowCount, List<QueryParameters> queryList) {
         this.rowCount = rowCount;
         this.queryList = queryList;
     }

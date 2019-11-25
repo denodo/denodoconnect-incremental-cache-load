@@ -4,6 +4,7 @@ public class QueryParameters {
 
     private String query;
     private Object[] parameters;
+    private int chunkSize;
 
     public String getQuery() {
         return query;
@@ -19,5 +20,13 @@ public class QueryParameters {
 
     public void setParameters(Object[] parameters) {
         this.parameters = parameters;
+    }
+
+    public int getChunkSize() {
+        return chunkSize;
+    }
+
+    public void setChunkSize(int chunkSize) {
+        this.chunkSize = chunkSize;
     }
 }
