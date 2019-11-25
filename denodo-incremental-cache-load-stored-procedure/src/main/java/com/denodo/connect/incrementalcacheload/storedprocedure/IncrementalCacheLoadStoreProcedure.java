@@ -181,10 +181,6 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 aux.next();
                 // Count of the updated PKs at this point
                 updated = updated + q.getChunkSize();
-                // TODO: 22/11/2019 test error
-                if (updated >= 20) {
-                    throw new StoredProcedureException("test chunk");
-                }
             } catch (SQLException | StoredProcedureException e) {
                 log(LOG_DEBUG, "ERROR in executeUpdateCache(): Query - " + q
                     + " [Rows updated in cache: " + updated +"]. " + e);
@@ -209,6 +205,7 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
                 + " CONTEXT('cache'='off')";
 
         int rowCount = 0;
+        // Used to know the updated rows when the update cache queries are executed
         List<QueryParameters> queryList = new ArrayList<>();
         ResultSet rs = null;
         try {
