@@ -1,3 +1,7 @@
+[versionxxxx]
+========
+- Added #46000 - Include the number of cached tuples (if any) in the exception message
+
 [20191121]
 ========
 - Added #45939 - Change the way we deal with PKs with multiple fields
