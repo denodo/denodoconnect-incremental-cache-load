@@ -264,14 +264,14 @@
         <dependency>
             <groupId>com.denodo.vdp</groupId>
             <artifactId>denodo-vdp-server</artifactId>
-            <version>6.0.10</version>
+            <version>7.0.0</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.denodo.vdp</groupId>
             <artifactId>denodo-vdp-parser</artifactId>
-            <version>6.0.10</version>
+            <version>7.0.0</version>
             <scope>provided</scope>
         </dependency>
 
