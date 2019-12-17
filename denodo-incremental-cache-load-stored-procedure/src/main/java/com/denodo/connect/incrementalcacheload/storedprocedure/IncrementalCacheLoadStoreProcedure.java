@@ -147,7 +147,9 @@ public class IncrementalCacheLoadStoreProcedure extends AbstractStoredProcedure 
             // Add a row with the stored procedure out parameter as the stored procedure
             // result
             getProcedureResultSet()
-                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows (distinct PK values): "
+                // 17/12/2019 IMPORTANT: Don't modify any char in this message as it could affect
+                // the way Scheduler parses it
+                .addRow(new Object[]{"Cache Refreshed Successfully. Updated rows (distinct PK values):"
                     + queryList.getRowCount()});
 
         } catch (IncrementalCacheLoadStoreProcedureException e) {
