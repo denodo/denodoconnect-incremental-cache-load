@@ -1,3 +1,7 @@
+20191217
+========
+- Fixed #46405 - NumberFormatException calling the procedure from Scheduler
+
 20191211
 ========
 - Added #46000 - Include the number of cached tuples (if any) in the exception message
