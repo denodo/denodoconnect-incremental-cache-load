@@ -31,4 +31,4 @@ For more info, see the User Manual at the /doc folder.
 
 This software is part of the DenodoConnect component collection.
 
-Copyright (c) 2018, denodo technologies (http://www.denodo.com)
+Copyright (c) 2020, denodo technologies (http://www.denodo.com)
