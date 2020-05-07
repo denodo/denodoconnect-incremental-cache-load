@@ -30,7 +30,7 @@
     <name>${project.artifactId}</name>
 	<description>Incremental Cache Load Stored Procedure for Denodo Virtual DataPort</description>
     <packaging>jar</packaging>
-    <version>20200505</version>
+    <version>20200507</version>
 
     <licenses>
         <license>
@@ -47,6 +47,11 @@
 
 
     <properties>
+        <extension.name>denodo-incremental-cache-load</extension.name>
+        <extension.description>${project.artifactId}</extension.description>
+        <extension.version>${project.version}</extension.version>
+        <extension.target.version>8.0</extension.target.version>
+        <!--        <extension.target.update>20200101</extension.target.update>-->
         <project.build.sourceEncoding>US-ASCII</project.build.sourceEncoding>
         <maven.compile.source>11</maven.compile.source>
         <maven.compile.target>11</maven.compile.target>
@@ -170,13 +175,14 @@
                         <manifestSections>
                             <manifestSection>
                                 <name>com.denodo</name>
-                                <manifestEntries>                            
-                                    <Extension-Name>${project.artifactId}</Extension-Name>
-                                    <Extension-Description>${project.name}</Extension-Description>
-                                    <Extension-Version>${project.version}</Extension-Version>
-                                    <Extension-Target-Version>8.0</Extension-Target-Version>
+                                <manifestEntries>
+                                    <Extension-Name>${extension.name}</Extension-Name>
+                                    <Extension-Description>${extension.description}</Extension-Description>
+                                    <Extension-Version>${extension.version}</Extension-Version>
+                                    <Extension-Target-Version>${extension.target.version}</Extension-Target-Version>
+<!--                                    <Extension-Target-Update>${extension.target.update}</Extension-Target-Update>-->
                                     <Extension-Website>http://support.denodo.com</Extension-Website>
-                                 </manifestEntries>
+                                </manifestEntries>
                             </manifestSection>
                         </manifestSections>                            
                     </archive>

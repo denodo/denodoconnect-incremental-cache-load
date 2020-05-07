@@ -1,3 +1,7 @@
+20200507
+========
+- #48847 - Adapt metadata to new schema
+
 20200505
 ========
 - First version of the Denodo Incremental Cache Load Stored Procedure for Denodo 8.0.
